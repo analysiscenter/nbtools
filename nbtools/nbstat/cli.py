@@ -25,7 +25,7 @@ def main(name, interval=None):
     except Exception: # pylint: disable=broad-except
         pass
 
-    args = parse_args()
+    args = parse_args(name)
     formatter = NAME_TO_FORMATTER[name]
 
     # Update formatter with cmd arguments
@@ -49,7 +49,7 @@ def main(name, interval=None):
     else:
         output_looped(partial_function, interval=interval)
 
-def parse_args():
+def parse_args(name):
     """ !!. """
     # add show-all
     argv = list(sys.argv[1:])
@@ -72,7 +72,17 @@ def parse_args():
                         help='!!.')
     parser.add_argument('--process-memory-format', type=str, default='GB', help='!!.')
     parser.add_argument('--device-memory-format', type=str, default='MB', help='!!.')
-    return vars(parser.parse_args(argv))
+
+    parser.add_argument('index_condition', nargs='?', default=None)
+    args = vars(parser.parse_args(argv))
+
+    if args['add_separator'] is False:
+        args['separate_supheader'] = False
+        args['separate_header'] = False
+
+    _ = name
+
+    return args
 
 
 def output_once(partial_function):

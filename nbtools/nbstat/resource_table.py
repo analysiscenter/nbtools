@@ -42,64 +42,68 @@ class ResourceEntry(dict):
             Other parameters for string creation like memory format, width, etc.
         """
         resource = Resource.parse_alias(resource)
-        template = '{0}'
+        default_string = '-'
+        style, string = None, None
         data = self.get(resource, None)
 
         # Process description
-        if resource == Resource.PY_NAME:
-            template = terminal.bold + '{0}'
-
-        elif resource in [Resource.PY_TYPE, Resource.PY_PID, Resource.PY_SELFPID, Resource.PY_STATUS]:
-            template = terminal.white + '{0}'
-
+        if resource in [Resource.PY_NAME, Resource.PY_PATH, Resource.PY_TYPE,
+                        Resource.PY_PID, Resource.PY_SELFPID, Resource.PY_STATUS]:
+            pass
         elif resource == Resource.PY_CREATE_TIME:
-            template = terminal.white + '{0}'
             data = datetime.fromtimestamp(data).strftime("%Y-%m-%d %H:%M:%S")
-
         elif resource == Resource.PY_KERNEL:
-            template = terminal.white + '{0}'
             data = data.split('-')[0] if data is not None else 'N/A'
 
         # Process resources
+        elif resource == Resource.PY_CPU:
+            data = self[Resource.PY_PROCESS].cpu_percent(interval=kwargs.get('interval', 0.01))
+            data = round(data)
+
+            if data > 30:
+                style = terminal.bold
+            string = f'{data}%' # don't use the `％` symbol as it is not unit wide
+
         elif resource == Resource.PY_RSS:
-            template = terminal.bold + terminal.cyan + '{0}'
             if data is not None:
                 rounded, unit = format_memory(data, format=kwargs['process_memory_format'])
                 data = f'{rounded} {unit}'
 
         # Device description
         elif resource == Resource.DEVICE_ID:
-            template = (terminal.bold + terminal.blue + '{0}' + terminal.normal) + (terminal.cyan + ' [{1}]')
             if data is not None:
                 device_name = (self[Resource.DEVICE_NAME].replace('NVIDIA', '').replace('RTX', '')
                                .replace('  ', ' ').strip())
-                data = [device_name, data]
+                string = f'{device_name} {terminal.cyan}[{data}]'
 
         elif resource == Resource.DEVICE_SHORT_ID:
-            template = terminal.blue + '[{0}]'
-            data = self.get(Resource.DEVICE_ID, None)
+            data = self.get(Resource.DEVICE_ID, None) or default_string
+            string = f'[{data}]'
 
         # Device resources
         elif resource == Resource.DEVICE_MEMORY_USED:
-            template = terminal.yellow + '{0}' + terminal.normal + terminal.bold + '{1}'
-
             if data is not None:
                 if data > 10*1024*1024:
-                    template = terminal.bold + template
+                    style = terminal.bold
+                else:
+                    style = ''
 
                 memory_format = kwargs['device_memory_format']
                 used, unit = format_memory(data, format=memory_format)
                 total, unit = format_memory(self[Resource.DEVICE_MEMORY_TOTAL], format=memory_format)
 
                 n_digits = len(str(total))
-                data = [f'{used:>{n_digits}}/{total}', ' ' + unit]
+                string = (f'{terminal.normal + terminal.yellow}{style}{used:>{n_digits}}'
+                          f'{terminal.normal + terminal.bold} / '
+                          f'{terminal.normal + terminal.yellow}{style}{total} '
+                          f'{terminal.normal + terminal.bold}{unit}')
 
         elif resource == Resource.DEVICE_PROCESS_MEMORY_USED:
-            template = terminal.yellow + '{0}' + terminal.normal + terminal.bold + '{1}'
-
             if data is not None:
                 if data > 10*1024*1024:
-                    template = terminal.bold + template
+                    style = terminal.bold
+                else:
+                    style = ''
 
                 memory_format = kwargs['device_memory_format']
                 used_process, unit = format_memory(data, format=memory_format)
@@ -107,40 +111,53 @@ class ResourceEntry(dict):
                 total, _ = format_memory(self[Resource.DEVICE_MEMORY_TOTAL], format=memory_format)
 
                 n_digits = len(str(total))
-                data = [f'{used_process:>{n_digits}}/{max(used_device, used_process):>{n_digits}}/{total}', ' ' + unit]
+                string = (f'{terminal.normal + terminal.yellow}{style}{used_process:>{n_digits}}'
+                          f'{terminal.normal + terminal.bold} / '
+                          f'{terminal.normal + terminal.yellow}{style}{max(used_device, used_process):>{n_digits}}'
+                          f'{terminal.normal + terminal.bold} / '
+                          f'{terminal.normal + terminal.yellow}{style}{total} '
+                          f'{terminal.normal + terminal.bold}{unit}')
+            else:
+                # Fallback to total device memory usage, if possible
+                if self.get(Resource.DEVICE_MEMORY_USED, None) is not None:
+                    entry = {key : self[key] for key in [Resource.DEVICE_MEMORY_USED, Resource.DEVICE_MEMORY_TOTAL]}
+                    entry = ResourceEntry(entry)
+                    style, string = entry.to_format_data(resource=Resource.DEVICE_MEMORY_USED,
+                                                         terminal=terminal, **kwargs)
 
         elif resource == Resource.DEVICE_POWER_USED:
-            template = terminal.magenta + '{0}'
-
             if data is not None:
                 power_used = data // 1000
                 power_total = self[Resource.DEVICE_POWER_TOTAL] // 1000
-                data = f'{power_used:>3}/{power_total:>3} W'
+                string = f'{power_used:>3}/{power_total:>3} W'
 
-        elif resource == Resource.DEVICE_UTIL:
-            template = terminal.green + '{0}'
+        elif resource in [Resource.DEVICE_FAN, Resource.DEVICE_UTIL]:
             if data is not None:
                 if data > 30:
-                    template = terminal.bold + template
-                data = f'{data}%' # don't use the `％` symbol as it is not unit wide
+                    style = terminal.bold
+                string = f'{data}%' # don't use the `％` symbol as it is not unit wide
 
         elif resource == Resource.DEVICE_TEMP:
-            template = terminal.red + '{0}'
             if data is not None:
-                if data > 30:
-                    template = terminal.bold + template
-                data = f'{data}°C' # don't use the `℃` symbol as it is not unit wide
+                if data > 40:
+                    style = terminal.bold
+                string = f'{data}°C' # don't use the `℃` symbol as it is not unit wide
 
         # Table delimiters
         elif resource == Resource.TABLE_DELIMITER1:
-            data = '|'
+            string = '|'
         elif resource == Resource.TABLE_DELIMITER2:
-            data = '||'
+            string = '||'
 
-        template = template + terminal.normal
-        data = data if data is not None else (['N/A'] + [''] * 4)
-        data = data if isinstance(data, list) else [data]
-        return template, data
+        # Default values
+        if style is None:
+            style = ''
+        if string is None:
+            if data is not None:
+                string = str(data)
+            else:
+                string = default_string
+        return style, string
 
 
 class ResourceTable:
@@ -211,11 +228,6 @@ class ResourceTable:
             return ResourceTable(data=[entry for entry, flag in zip(self, key) if flag])
 
         raise TypeError(f'Unsupported type {type(key)} for getitem!')
-
-    def aggregate(self, key, default=0.0, aggregation=max):
-        """ Apply `aggregation` to values from a `key`-column. `None` values are changed to `default`. """
-        data = [(item if item is not None else default) for item in self[key]]
-        return aggregation(data)
 
     @property
     def columns(self):
@@ -475,6 +487,23 @@ class ResourceTable:
         return result
 
 
+    # Work with columns
+    def apply(self, key, function):
+        """ Apply `function` to a `key` column. """
+        for entry in self:
+            entry[key] = function(entry[key])
+
+    def add_column(self, key, function):
+        """ Apply `function` to each entry in the table and store as `key` column. """
+        for entry in self:
+            entry[key] = function(entry)
+
+    def aggregate(self, key, default=0.0, aggregation=max):
+        """ Apply `aggregation` to values from a `key`-column. `None` values are changed to `default`. """
+        data = [(item if item is not None else default) for item in self[key]]
+        return aggregation(data)
+
+
     # Display
     def __str__(self):
         return repr('\n'.join([str(entry) for entry in self.data]))
@@ -509,79 +538,72 @@ class ResourceTable:
                add_separator=True, separator='-', hide_similar=True,
                process_memory_format='GB', device_memory_format='MB'):
         """ !!. """
-        default_data = [''] * 5
         subtables = self.split_by_index()
         kwargs = {'process_memory_format' : process_memory_format,
                   'device_memory_format' : device_memory_format}
 
         lines = [[] for _ in range(1 + len(self))]
-        for column in formatter.included_only:
+        for column_dict in formatter.included_only:
             # Retrieve parameters of the column display
-            resource = column['resource']
-            hidable = column.get('hidable', False)
-            min_width = column.get('min_width', 0)
+            resource = column_dict['resource']
+            hidable, min_width = column_dict.get('hidable', False), column_dict.get('min_width', 0)
+            column_kwargs = {**kwargs, **{key : value for key, value in column_dict.items() if key != 'resource'}}
 
-            templates, data = [], []
+            styles, strings = [], []
 
             # Table header: names of the columns
+            main_style, header_string = resource.to_format_data(terminal=terminal, **column_kwargs)
             if add_header:
-                header_template, header_data = resource.to_format_data(terminal=terminal, **kwargs)
-                templates.append(header_template)
-                data.append(header_data)
+                header_style = ''
+                if 'TABLE_DELIMITER' not in resource.name:
+                    header_style += (terminal.underline if underline_header else '')
+                    header_style += (terminal.bold if bold_header else '')
+                styles.append(header_style)
+                strings.append(header_string)
 
             # Body of the table: add sublines for each table entry
             for subtable in subtables:
                 for i, entry in enumerate(subtable):
-                    template, data_ = entry.to_format_data(resource=resource, terminal=terminal, **kwargs)
+                    style, string = entry.to_format_data(resource=resource, terminal=terminal, **column_kwargs)
 
+                    # Changes based on the position of entry
                     if aggregate and i == 0:
                         remaining_table = subtable[1:]
-                        template_, data__ = remaining_table.to_format_data(resource=resource, terminal=terminal,
-                                                                           **kwargs)
-                        template = template_ if template_ is not None else template
-                        data_ = data__ if data__ is not None else data_
-
+                        style, string = remaining_table.to_format_data(resource=resource, terminal=terminal,
+                                                                       **column_kwargs)
                     if hide_similar and hidable and i > 0:
-                        template = '{0}'
-                        data_ = default_data
+                        style, string = '', ''
 
-                    templates.append(template)
-                    data.append(data_)
+                    styles.append(style)
+                    strings.append(string)
 
-            # Modify header template to match the templates of rows
+            # Modify header style
             if add_header:
-                if templates[0] is None:
-                    if len(templates) > 1:
-                        templates[0] = max(templates[1:], key=len)
-                    else:
-                        templates[0] = '{0}'
-                if 'TABLE_DELIMITER' not in resource.name:
-                    if underline_header:
-                        templates[0] = terminal.underline + templates[0]
-                    if bold_header:
-                        templates[0] = terminal.bold + templates[0]
+                if len(styles) > 1:
+                    styles[0] += terminal.bold * max(terminal.bold in style for style in styles)
 
-            # Make every subline the same width
-            substrings = [template.format(*data_, *default_data) for template, data_ in zip(templates, data)]
-            max_len = max(true_len(substring) for substring in substrings)
+            # Make every string the same width
+            strings = [main_style + style + string + terminal.normal
+                       for style, string in zip(styles, strings)]
+            max_len = max(true_len(string) for string in strings)
             width = max(min_width, max_len)
-            substrings = [true_rjust(substring, width) for substring in substrings]
+            strings = [true_rjust(string, width) for string in strings]
 
-            for line, substring in zip(lines, substrings):
-                line.append(substring)
+            for line, string in zip(lines, strings):
+                line.append(string)
 
         lines = [' '.join(line).rstrip() for line in lines]
 
         # Add separators between index values
-        if add_separator or separate_header:
+        if add_separator or (add_header and separate_header):
             s, separator_indices = 1 if add_header else 0, []
             for subtable in subtables:
                 separator_indices.append(s)
                 s += len(subtable)
 
-            if separate_header and add_separator:
+            if (add_header and separate_header) and add_separator:
                 separator_indices = separator_indices[::-1]
-            elif separate_header:
+            elif add_header and separate_header:
                 separator_indices = separator_indices[:0]
             else:
                 separator_indices = separator_indices[1:][::-1]

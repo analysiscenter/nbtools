@@ -109,77 +109,83 @@ class ResourceFormatter(list):
 
 NBSTAT_FORMATTER = ResourceFormatter([
     # Notebook/script name
-    {'resource' : Resource.PY_NAME, 'include' :  True, 'hidable' :  True},
+    {'resource' : Resource.PY_NAME, 'include' : True, 'hidable': True},
+    {'resource' : Resource.PY_PATH, 'include' : False, 'hidable': True},
 
     # Process info
-    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.PY_TYPE, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.PY_PID, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.PY_SELFPID, 'include' : False, 'hidable' : False},
-    {'resource' : Resource.PY_KERNEL, 'include' : False, 'hidable' : True},
-    {'resource' : Resource.PY_STATUS, 'include' : False, 'hidable' : False, 'min_width' : 10},
+    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
+    {'resource' : Resource.PY_TYPE, 'include' : True},
+    {'resource' : Resource.PY_PID, 'include' : True},
+    {'resource' : Resource.PY_SELFPID, 'include' : False},
+    {'resource' : Resource.PY_KERNEL, 'include' : False},
+    {'resource' : Resource.PY_STATUS, 'include' : False, 'min_width' : 10},
 
-    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.PY_CREATE_TIME, 'include' : False, 'hidable' : False},
+    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
+    {'resource' : Resource.PY_CREATE_TIME, 'include' : False},
 
     # Process resource usage
-    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.PY_RSS, 'include' : True, 'hidable' : True, 'min_width': 8},
+    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
+    {'resource' : Resource.PY_CPU, 'include' : False, 'min_width' : 5},
+    {'resource' : Resource.PY_RSS, 'include' : True, 'min_width' : 8},
 
     # Process device usage
-    {'resource' : Resource.TABLE_DELIMITER2, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.DEVICE_SHORT_ID, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.DEVICE_MEMORY_USED, 'include' : False, 'hidable' : False},
-    {'resource' : Resource.DEVICE_PROCESS_MEMORY_USED, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.DEVICE_UTIL, 'include' : True, 'hidable' : False, 'min_width' : 5},
-    {'resource' : Resource.DEVICE_TEMP, 'include' : True, 'hidable' : False, 'min_width' : 5},
-    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.DEVICE_POWER_USED, 'include' : False, 'hidable' : False},
+    {'resource' : Resource.TABLE_DELIMITER2, 'include' : True},
+    {'resource' : Resource.DEVICE_SHORT_ID, 'include' : True},
+    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
+    {'resource' : Resource.DEVICE_MEMORY_USED, 'include' : False},
+    {'resource' : Resource.DEVICE_PROCESS_MEMORY_USED, 'include' : True},
+    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
+    {'resource' : Resource.DEVICE_UTIL, 'include' : True, 'min_width' : 5},
+    {'resource' : Resource.DEVICE_TEMP, 'include' : True, 'min_width' : 5},
+    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
+    {'resource' : Resource.DEVICE_POWER_USED, 'include' : False},
+    {'resource' : Resource.DEVICE_FAN, 'include' : False, 'min_width' : 4},
 ])
 
 
 DEVICESTAT_FORMATTER = ResourceFormatter([
     # Device usage
     {'resource' : Resource.DEVICE_ID, 'include' : True, 'hidable' : True},
-    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True, 'hidable' : True},
+    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
     {'resource' : Resource.DEVICE_UTIL, 'include' : True, 'hidable' : True, 'min_width' : 5},
     {'resource' : Resource.DEVICE_TEMP, 'include' : True, 'hidable' : True, 'min_width' : 5},
     {'resource' : Resource.DEVICE_POWER_USED, 'include' : False, 'hidable' : True},
-    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True, 'hidable' : False},
+    {'resource' : Resource.DEVICE_FAN, 'include' : False, 'hidable' : True, 'min_width' : 4},
+    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
 
     # Individual processes for each device
-    {'resource' : Resource.PY_NAME, 'include' :  True, 'hidable' :  False},
-    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.DEVICE_MEMORY_USED, 'include' : False, 'hidable' : False},
-    {'resource' : Resource.DEVICE_PROCESS_MEMORY_USED, 'include' : True, 'hidable' : False},
+    {'resource' : Resource.DEVICE_MEMORY_USED, 'include' : False},
+    {'resource' : Resource.DEVICE_PROCESS_MEMORY_USED, 'include' : True},
+    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
+
     # Notebook/script name
+    {'resource' : Resource.PY_NAME, 'include' : True},
+    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
 
     # Process info
-    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.PY_TYPE, 'include' : False, 'hidable' : False},
-    {'resource' : Resource.PY_PID, 'include' : False, 'hidable' : False},
-    {'resource' : Resource.PY_SELFPID, 'include' : False, 'hidable' : False},
-    {'resource' : Resource.PY_KERNEL, 'include' : False, 'hidable' : True},
-    {'resource' : Resource.PY_STATUS, 'include' : False, 'hidable' : True},
-    {'resource' : Resource.PY_CREATE_TIME, 'include' : False, 'hidable' : False},
+    {'resource' : Resource.PY_TYPE, 'include' : False},
+    {'resource' : Resource.PY_PID, 'include' : False},
+    {'resource' : Resource.PY_SELFPID, 'include' : False},
+    {'resource' : Resource.PY_KERNEL, 'include' : False},
+    {'resource' : Resource.PY_STATUS, 'include' : False},
+    {'resource' : Resource.PY_CREATE_TIME, 'include' : False},
 
     # Process resource usage
-    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.PY_RSS, 'include' : False, 'hidable' : False, 'min_width' : 10},
+    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
+    {'resource' : Resource.PY_CPU, 'include' : False, 'min_width' : 5},
+    {'resource' : Resource.PY_RSS, 'include' : False, 'min_width' : 10},
 
 ])
 
 
 GPUSTAT_FORMATTER = ResourceFormatter([
     # Device usage
-    {'resource' : Resource.DEVICE_ID, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.DEVICE_UTIL, 'include' : True, 'hidable' : False, 'min_width': 5},
-    {'resource' : Resource.DEVICE_TEMP, 'include' : True, 'hidable' : False, 'min_width': 5},
-    {'resource' : Resource.DEVICE_POWER_USED, 'include' : False, 'hidable' : False},
-    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.DEVICE_MEMORY_USED, 'include' : True, 'hidable' : False},
-    {'resource' : Resource.DEVICE_PROCESS_MEMORY_USED, 'include' : False, 'hidable' : False},
+    {'resource' : Resource.DEVICE_ID, 'include' : True},
+    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
+    {'resource' : Resource.DEVICE_UTIL, 'include' : True, 'min_width': 5},
+    {'resource' : Resource.DEVICE_TEMP, 'include' : True, 'min_width': 5},
+    {'resource' : Resource.DEVICE_POWER_USED, 'include' : False},
+    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
+    {'resource' : Resource.DEVICE_MEMORY_USED, 'include' : True},
+    {'resource' : Resource.DEVICE_PROCESS_MEMORY_USED, 'include' : False},
 ])

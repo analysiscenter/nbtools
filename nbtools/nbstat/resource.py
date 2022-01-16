@@ -38,15 +38,18 @@ class Resource(Enum):
     the corresponding if-clause in the `ResourceInspector.get_device_table`.
     """
     # Possible columns in python-table: notebooks and python scripts
+    PY_PROCESS = auto()
     PY_TYPE = auto()
     PY_NAME = auto()
     PY_PATH = auto()
     PY_PID = auto()
     PY_SELFPID = auto()
     PY_CREATE_TIME = auto()
-    PY_RSS = auto()
     PY_KERNEL = auto()
     PY_STATUS = auto()
+
+    PY_RSS = auto()
+    PY_CPU = auto()
 
     # Possible columns in device-table: information about each device
     DEVICE_ID = auto()
@@ -88,21 +91,53 @@ class Resource(Enum):
         """ Create a string template and data for a given `self=resource`.
         For more information about formatting refer to `ResourceTable.format` method.
         """
-        _ = terminal, kwargs
-        template = None # for possible future changes
+        _ = kwargs
+        style, string = None, None
 
-        if self == Resource.DEVICE_ID:
-            data = ['DEVICE NAME', 'ID']
+        # Process description
+        if self == Resource.PY_NAME:
+            style = terminal.bold
+            string = 'PROCESS NAME'
+        elif self in [Resource.PY_TYPE, Resource.PY_PID, Resource.PY_SELFPID,
+                          Resource.PY_STATUS, Resource.PY_CREATE_TIME, Resource.PY_KERNEL]:
+            style = terminal.white
+
+        # Process resources
+        elif self in [Resource.PY_RSS, Resource.PY_CPU]:
+            style = terminal.bold + terminal.cyan
+
+        # Device description
+        elif self == Resource.DEVICE_ID:
+            style = terminal.blue
+            string = 'DEVICE NAME ' + terminal.cyan + '[ID]'
         elif self == Resource.DEVICE_SHORT_ID:
-            data = ['DEVICE ID']
+            style = terminal.blue
+            string = 'DEVICE ID'
+
+        # Device resources
+        elif self == Resource.DEVICE_MEMORY_USED:
+            style = terminal.yellow
+        elif self == Resource.DEVICE_PROCESS_MEMORY_USED:
+            style = terminal.yellow
+        elif self == Resource.DEVICE_POWER_USED:
+            style = terminal.magenta
+        elif self == Resource.DEVICE_UTIL:
+            style = terminal.green
+        elif self == Resource.DEVICE_TEMP:
+            style = terminal.red
+
+        # Table elements
         elif self == Resource.TABLE_DELIMITER1:
-            data = ['|']
+            string = '|'
         elif self == Resource.TABLE_DELIMITER2:
-            data = ['||']
-        else:
-            data = self.name.replace('PY_', '').replace('DEVICE_', '').replace('_USED', '').replace('_', ' ')
-            data = [data]
-        return template, data
+            string = '||'
+
+        # Default values
+        if style is None:
+            style = ''
+        if string is None:
+            string = self.name.replace('PY_', '').replace('DEVICE_', '').replace('_USED', '').replace('_', ' ')
+        return style, string
 
 
 # Dictionary with aliases for each Resource: more aliases can be added by setting values in Enum instead of `auto`

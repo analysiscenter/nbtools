@@ -49,6 +49,7 @@ class ResourceInspector:
         self.formatter = formatter
         self._device_handles = None
 
+        self.pid_to_process = {}
 
     @property
     def device_handles(self):
@@ -62,6 +63,7 @@ class ResourceInspector:
         return self._device_handles
 
 
+    # Collect system resources into ResourceTables
     def get_device_table(self, inspect_processes=True):
         """ !!. """
         device_table, device_process_table = ResourceTable(), ResourceTable()
@@ -79,6 +81,10 @@ class ResourceInspector:
             if self.formatter.get(Resource.DEVICE_TEMP, False):
                 temperature = nvidia_smi.nvmlDeviceGetTemperature(handle, nvidia_smi.NVML_TEMPERATURE_GPU)
                 common_info[Resource.DEVICE_TEMP] = temperature
+
+            if self.formatter.get(Resource.DEVICE_FAN, False):
+                fan_speed = nvidia_smi.nvmlDeviceGetFanSpeed(handle)
+                common_info[Resource.DEVICE_FAN] = fan_speed
 
             if self.formatter.get(Resource.DEVICE_POWER_USED, False):
                 power_used = nvidia_smi.nvmlDeviceGetPowerUsage(handle)
@@ -148,7 +154,6 @@ class ResourceInspector:
                     Resource.PY_NAME : instance['notebook']['name'],
                     Resource.PY_PATH : os.path.join(root_dir, instance['notebook']['path']),
                     Resource.PY_KERNEL : kernel_id,
-                    Resource.PY_STATUS : instance['kernel']['execution_state'],
                 }
                 notebook_table.append(notebook_info)
         return notebook_table
@@ -169,7 +174,10 @@ class ResourceInspector:
         process_table = ResourceTable()
         for pid in python_pids:
             try:
-                process = psutil.Process(pid)
+                if pid not in self.pid_to_process:
+                    self.pid_to_process[pid] = psutil.Process(pid)
+                process = self.pid_to_process[pid]
+
                 with process.oneshot():
                     # Command used to start the Python interpreter
                     cmdline = ' '.join(process.cmdline())
@@ -214,10 +222,13 @@ class ResourceInspector:
                         Resource.PY_PATH : path,
                         Resource.PY_CREATE_TIME : process.create_time(),
                         Resource.PY_KERNEL : kernel_id,
-                        Resource.PY_STATUS : status
+                        Resource.PY_STATUS : status,
+                        Resource.PY_PROCESS : process
                     }
 
-                    # TODO: add option to get more stats
+                    if self.formatter.get(Resource.PY_CPU, False):
+                        process_info[Resource.PY_CPU] = process.cpu_percent()
+
                     if self.formatter.get(Resource.PY_RSS, False):
                         memory = process.memory_info()
                         process_info[Resource.PY_RSS] = memory.rss
@@ -229,33 +240,7 @@ class ResourceInspector:
         return process_table
 
 
-    def add_supheader(self, lines, terminal, underline=True, bold=True, separate=True):
-        """ !!. """
-        timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-        driver_version = '.'.join(nvidia_smi.nvmlSystemGetDriverVersion().decode().split('.')[:-1])
-        cuda_version = nvidia_smi.nvmlSystemGetNVMLVersion().decode()[:4]
-        supheader = f'{timestamp}   Driver Version: {driver_version}   CUDA Version:{cuda_version}'
-
-        if underline:
-            supheader = terminal.underline + supheader
-        if bold:
-            supheader = terminal.bold + supheader
-        supheader = supheader + terminal.normal
-
-        supheader_width = true_len(supheader)
-        table_width = true_len(lines[0])
-
-        if supheader_width <= table_width:
-            supheader = true_rjust(supheader, table_width)
-        else:
-            lines = [true_rjust(line, supheader_width) for line in lines]
-        lines.insert(0, supheader)
-
-        if separate:
-            lines.insert(1, '-' * true_len(supheader))
-        return lines
-
-
+    # Aggregate multiple ResourceTables into more representative tables
     def get_nbstat_table(self, sort=True, only_device_processes=True, at_least_one_device=True):
         """ !!. """
         #
@@ -273,10 +258,20 @@ class ResourceInspector:
 
 
         if sort:
-            table.sort(key=Resource.PY_CREATE_TIME, reverse=False)
+            # Custom sort for nbview. Create multiple flags for sorting
+            is_parent = lambda entry: entry[Resource.PY_PID] == entry[Resource.PY_SELFPID]
+            table.add_column('is_parent', is_parent)
+
+            has_device = lambda entry: entry[Resource.DEVICE_ID] is not None
+            table.add_column('has_device', has_device)
+
+            table.sort(key=['is_parent', 'has_device', Resource.PY_CREATE_TIME],
+                       reverse=[True, True, False])
+
         if only_device_processes:
             if device_process_table:
-                function = lambda entry: (entry[Resource.DEVICE_ID] is not None)
+                function = lambda entry: (entry[Resource.DEVICE_ID] is not None or \
+                                          entry[Resource.PY_PID] == entry[Resource.PY_SELFPID])
                 table.filter(function, inplace=True)
             else:
                 table = ResourceTable()
@@ -310,11 +305,38 @@ class ResourceInspector:
 
         table.sort(key=Resource.PY_CREATE_TIME, reverse=False)
         table.set_index(Resource.DEVICE_ID, inplace=True)
-        table.sort_by_index(key=Resource.DEVICE_ID, aggregation=sum)
+        table.sort_by_index(key=Resource.DEVICE_ID, aggregation=min)
         return table
 
 
-    def get_view(self, name='nbstat', terminal=None,
+    # Make formatted visualization of tables
+    def add_supheader(self, lines, terminal, underline=True, bold=True, separate=True):
+        """ !!. """
+        timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+        driver_version = '.'.join(nvidia_smi.nvmlSystemGetDriverVersion().decode().split('.')[:-1])
+        cuda_version = nvidia_smi.nvmlSystemGetNVMLVersion().decode()[:4]
+        supheader = f'{timestamp}   Driver Version: {driver_version}   CUDA Version:{cuda_version}'
+
+        if underline:
+            supheader = terminal.underline + supheader
+        if bold:
+            supheader = terminal.bold + supheader
+        supheader = supheader + terminal.normal
+
+        supheader_width = true_len(supheader)
+        table_width = true_len(lines[0])
+
+        if supheader_width <= table_width:
+            supheader = true_rjust(supheader, table_width)
+        else:
+            lines = [true_rjust(line, supheader_width) for line in lines]
+        lines.insert(0, supheader)
+
+        if separate:
+            lines.insert(1, '-' * true_len(supheader))
+        return lines
+
+    def get_view(self, name='nbstat', terminal=None, index_condition=None,
                  sort=True, only_device_processes=True, at_least_one_device=True,
                  add_supheader=True, underline_supheader=True, bold_supheader=True, separate_supheader=True,
                  add_header=True, underline_header=True, bold_header=False, separate_header=True,
@@ -330,6 +352,10 @@ class ResourceInspector:
             table = self.get_gpustat_table()
         else:
             raise ValueError('Wrong name of view to get!')
+
+        if table and index_condition is not None:
+            function = lambda index_value, _: bool(re.search(index_condition, str(index_value)))
+            table.filter_on_index(function, inplace=True)
 
         terminal = terminal or COLORS
         lines = table.format(terminal=terminal, formatter=self.formatter, aggregate=aggregate,
