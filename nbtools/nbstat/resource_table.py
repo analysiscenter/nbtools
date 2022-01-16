@@ -1,22 +1,47 @@
-""" !!. """
+""" ResourceEntry -- a dict-like class to hold all properties (Resources) of an entry.
+ResourceTable -- sequence of multiple ResourceEntries with interface of merging, updating, sorting for multiple tables.
+Can be formatted into beautiful colored string representation by using `format` method.
+"""
 from datetime import datetime
 
-from .resource import Resource, parse_alias
+from .resource import Resource
 from .utils import format_memory, true_len, true_rjust
 
 class ResourceEntry(dict):
-    """ !!. """
+    """ Dictionary to hold all properties (Resources) of an entry.
+    An entry is any monitored entity -- Python process, Jupyter Notebook or device.
+    For more about Resources, refer to its class documentation.
+
+    `getitem` is overloaded to recognize Resource aliases (like `memory_util`) as actual Resource enumeration members.
+
+    The main method of this class, `format`, is used to create a string representation of a single requested property
+    from the contained information. As some of the requested columns require multiple values from the dictionary,
+    we can't use individual key-value pairs to create string representation on their own.
+    For example, the `DEVICE_MEMORY` column show the `'used_memory / total_memory MB'` information and
+    requires multiple items from the ResourceEntry at the same time.
+    """
     def __getitem__(self, key):
-        key = parse_alias(key)
+        key = Resource.parse_alias(key)
         return super().__getitem__(key)
 
     def get(self, key, default=None):
-        key = parse_alias(key)
+        key = Resource.parse_alias(key)
         return super().get(key, default)
 
-    def to_format_data(self, resource, terminal, process_memory_format, device_memory_format):
-        """ !!. """
-        resource = parse_alias(resource)
+    def to_format_data(self, resource, terminal, **kwargs):
+        """ Create a string template and data for a given `resource`. Essentially, a huge switch on `resource` type.
+        For more information about formatting refer to `ResourceTable.format` method.
+
+        Parameters
+        ----------
+        resource : member of Resource
+            Column to create string representation for.
+        terminal : blessed.Terminal
+            Terminal to use for text formatting and color control sequences.
+        kwargs : dict
+            Other parameters for string creation like memory format, width, etc.
+        """
+        resource = Resource.parse_alias(resource)
         template = '{0}'
         data = self.get(resource, None)
 
@@ -39,7 +64,7 @@ class ResourceEntry(dict):
         elif resource == Resource.PY_RSS:
             template = terminal.bold + terminal.cyan + '{0}'
             if data is not None:
-                rounded, unit = format_memory(data, format=process_memory_format)
+                rounded, unit = format_memory(data, format=kwargs['process_memory_format'])
                 data = f'{rounded} {unit}'
 
         # Device description
@@ -52,7 +77,7 @@ class ResourceEntry(dict):
 
         elif resource == Resource.DEVICE_SHORT_ID:
             template = terminal.blue + '[{0}]'
-            data = self[Resource.DEVICE_ID]
+            data = self.get(Resource.DEVICE_ID, None)
 
         # Device resources
         elif resource == Resource.DEVICE_MEMORY_USED:
@@ -62,8 +87,9 @@ class ResourceEntry(dict):
                 if data > 10*1024*1024:
                     template = terminal.bold + template
 
-                used, unit = format_memory(data, format=device_memory_format)
-                total, unit = format_memory(self[Resource.DEVICE_MEMORY_TOTAL], format=device_memory_format)
+                memory_format = kwargs['device_memory_format']
+                used, unit = format_memory(data, format=memory_format)
+                total, unit = format_memory(self[Resource.DEVICE_MEMORY_TOTAL], format=memory_format)
 
                 n_digits = len(str(total))
                 data = [f'{used:>{n_digits}}/{total}', ' ' + unit]
@@ -75,9 +101,10 @@ class ResourceEntry(dict):
                 if data > 10*1024*1024:
                     template = terminal.bold + template
 
-                used_process, unit = format_memory(data, format=device_memory_format)
-                used_device, unit = format_memory(self[Resource.DEVICE_MEMORY_USED], format=device_memory_format)
-                total, _ = format_memory(self[Resource.DEVICE_MEMORY_TOTAL], format=device_memory_format)
+                memory_format = kwargs['device_memory_format']
+                used_process, unit = format_memory(data, format=memory_format)
+                used_device, unit = format_memory(self[Resource.DEVICE_MEMORY_USED], format=memory_format)
+                total, _ = format_memory(self[Resource.DEVICE_MEMORY_TOTAL], format=memory_format)
 
                 n_digits = len(str(total))
                 data = [f'{used_process:>{n_digits}}/{max(used_device, used_process):>{n_digits}}/{total}', ' ' + unit]
@@ -104,10 +131,10 @@ class ResourceEntry(dict):
                     template = terminal.bold + template
                 data = f'{data}°C' # don't use the `℃` symbol as it is not unit wide
 
-        # Delimiters
-        elif resource == Resource.DELIMITER1:
+        # Table delimiters
+        elif resource == Resource.TABLE_DELIMITER1:
             data = '|'
-        elif resource == Resource.DELIMITER2:
+        elif resource == Resource.TABLE_DELIMITER2:
             data = '||'
 
         template = template + terminal.normal
@@ -117,18 +144,43 @@ class ResourceEntry(dict):
 
 
 class ResourceTable:
-    """ !!. """
+    """ Container for multiple ResourceEntries.
+    Provides API to work with multiple tables, collected about different types of entries. In this module, we use:
+        - a table about all Python processes, collected with `psutil` and the likes
+        - a table about Jupyter Notebooks, collected with requests to `jupyter_server` and `notebook` interfaces
+        - a table about system devices, collected with `nvidia-smi` Python bindings.
+
+    Creating a final table for actual representation requires some merges, sorts, filtering, etc.
+    For convenience, we implement all of the usual table methods: `merge`, `update`, `sort`, `filter`, as well as their
+    versions for working with tables with defined `index`.
+
+    For the most part, this class acts as a lightweight version of a`Pandas.DataFrame`: it saves us a huge dependency
+    and also allows to tweak some of the metods to our needs. As our tables are tiny, efficiency is not a concern.
+    If the `pandas` is already installed, `ResourceTable` can be converted to dataframe by using `to_pd` method.
+
+    Also provides method `format` for table visualization as a beautiful colored string representation.
+    Most of the design choices in this module are dictated by the needs of this method: classes are made as they are
+    so it is easy to use them there.
+
+    Current implementation uses `list` as the underlying container, which is appended by `ResourceEntries`.
+    Checks that the set of appended columns is the same as columns in previous entries, but does not guarantee
+    consistency of columns if initialized from list.
+
+    # TODO: can require `index` and/or `columns` at table creation, should we want so, for consistency
+    # TODO: can create a `PandasResourceTable` with the same API, but `pandas.DataFrame` under the hood
+    """
     #pylint: disable=self-cls-assignment
     def __init__(self, data=None):
         self._data = [] if data is None else [ResourceEntry(entry) for entry in data]
 
     @property
     def data(self):
-        """ !!. """
+        """ Property to make sure that every entry is an instance of `ResourceEntry`. """
         return self._data
 
     @data.setter
     def data(self, value):
+        """ Property to make sure that every entry is an instance of `ResourceEntry`. """
         self._data = [ResourceEntry(entry) for entry in value]
 
 
@@ -137,6 +189,13 @@ class ResourceTable:
         return len(self.data)
 
     def __getitem__(self, key):
+        """ Multiple ways to get items from the table:
+            - integer to get i-th entry from the table. Returns an instance of `ResourceEntry`
+            - slice to get range of entries from the table. Returns an instance of `ResourceTable`
+            - member of Resource enumeration or string alias to get column values. Returns list
+            - list with bools of the same length, as the self to signal which entries to include.
+            Returns an instance of `ResourceTable`
+        """
         if isinstance(key, int):
             return self.data[key]
 
@@ -144,7 +203,7 @@ class ResourceTable:
             return ResourceTable(self.data[key])
 
         if isinstance(key, (str, Resource)):
-            key = parse_alias(key)
+            key = Resource.parse_alias(key)
             return [entry[key] for entry in self]
 
         # Iterable with bools
@@ -154,17 +213,17 @@ class ResourceTable:
         raise TypeError(f'Unsupported type {type(key)} for getitem!')
 
     def aggregate(self, key, default=0.0, aggregation=max):
-        """ !!. """
+        """ Apply `aggregation` to values from a `key`-column. `None` values are changed to `default`. """
         data = [(item if item is not None else default) for item in self[key]]
         return aggregation(data)
 
     @property
     def columns(self):
-        """ !!. """
+        """ List of present columns. """
         return None if len(self.data) == 0 else list(self.data[0].keys())
 
     def append(self, entry):
-        """ !!. """
+        """ Check if the `keys` of `entry` match columns of the table. Wrap with `ResourceEntry`, if needed. """
         entry_columns = list(entry.keys())
 
         if self.columns is not None:
@@ -175,13 +234,16 @@ class ResourceTable:
         self.data.append(entry)
 
     def maybe_copy(self, return_self):
-        """ Inspired by Pandas. """
+        """ Inspired by Pandas. `return_self` coincides with `inplace` flag of the calling method. """
         return self if return_self else ResourceTable(self.data)
 
 
     # Logic
     def merge(self, other, self_key, other_key):
-        """ Create a new `ResourceTable` with info merged from `self` and `other`, based on `key`. """
+        """ Create a new `ResourceTable` with info merged from `self` and `other`,
+        from entries where values of `self_key` and `other_key` columns match. All of the entries in `self` remain.
+        If no matched entry present in `other`, values of additional columns are set to None.
+        """
         # Assert
         if self_key not in self.columns:
             raise ValueError(f'Key `{self_key}` is not found in `self`!')
@@ -215,7 +277,9 @@ class ResourceTable:
         return result
 
     def update(self, other, self_key, other_key, inplace=True):
-        """ !!. """
+        """ Update `self` table with `other` table, matching entries on `self_key` and `other_key` columns.
+        All of the columns in `other` should be present in `self`. All of the entries in `self` remain.
+        """
         self = self.maybe_copy(return_self=inplace)
 
         # Assert
@@ -223,6 +287,10 @@ class ResourceTable:
             raise ValueError(f'Key `{self_key}` is not found in `self`!')
         if other_key not in other.columns:
             raise ValueError(f'Key `{other_key}` is not found in `other`!')
+
+        if set(other.columns).intersection(set(self.columns)) != set(other.columns):
+            difference = set(other.columns).difference(set(other.columns).intersection(set(self.columns)))
+            raise ValueError(f'Columns of `other` should be a strict subset of `self` columns! Excess: {difference}')
 
         # Actual logic
         for self_entry in self:
@@ -233,7 +301,7 @@ class ResourceTable:
         return self
 
     def unroll(self, inplace=True):
-        """ !!. """
+        """ Unroll entries with sequence-values into multiple separate entries. """
         self = self.maybe_copy(return_self=inplace)
 
         unrolled = []
@@ -260,7 +328,19 @@ class ResourceTable:
         return self
 
     def sort(self, key, default=0.0, reverse=False, inplace=True):
-        """ !!. """
+        """ Sort the table based on `key`.
+
+        Parameters
+        ----------
+        key : Resource, string or sequence of them
+            Keys to sort on.
+        default : number or sequence of numbers
+            Default values to use instead of Nones.
+        reverse : bool or sequence of bools
+            Whether to use descending or ascending order of sort, individual for each key.
+        inplace : bool
+            Whether to return the same instance with changed data or a completely new instance.
+        """
         self = self.maybe_copy(return_self=inplace)
 
         # Parse parameters into the similar list structure
@@ -270,7 +350,7 @@ class ResourceTable:
         def itemgetter(entry):
             result = []
             for key_, default_, reverse_ in zip(key, default, reverse):
-                key_ = parse_alias(key_)
+                key_ = Resource.parse_alias(key_)
                 sign = -1 if reverse_ is True else +1
                 value = entry[key_] if entry[key_] is not None else default_
                 result.append(sign * value)
@@ -280,7 +360,7 @@ class ResourceTable:
         return self
 
     def filter(self, condition, inplace=True):
-        """ !!. """
+        """ Filter entries, based on `condition`. Keep only those which evaluate to True. """
         self = self.maybe_copy(return_self=inplace)
         self.data = [entry for entry in self if condition(entry)]
         return self
@@ -288,7 +368,9 @@ class ResourceTable:
 
     # Work with index
     def set_index(self, index, inplace=True):
-        """ !!. """
+        """ Select a column as the index of the table. Stable sorts on unique values of the index.
+        Under the hood, creates a list of unique values of chosen column to use in later methods.
+        """
         self = self.maybe_copy(return_self=inplace)
         index_values = []
         for entry in self:
@@ -308,6 +390,7 @@ class ResourceTable:
         return self
 
     def _get_subtable(self, index_value):
+        """ Extract subtable, corresponding to one of the current index values. """
         subtable = ResourceTable()
         for entry in self:
             if entry[self.index] == index_value:
@@ -315,7 +398,7 @@ class ResourceTable:
         return subtable
 
     def split_by_index(self):
-        """ !!. """
+        """ Split the table into a list of subtables, corresponding to unique index values. """
         subtables = []
         for index_value in self.index_values:
             subtable = self._get_subtable(index_value)
@@ -324,7 +407,9 @@ class ResourceTable:
         return subtables
 
     def sort_by_index(self, key, default=0.0, reverse=False, inplace=True, aggregation=max):
-        """ !!. """
+        """ Sort unique index values, based on aggregated values of `key` columns in their subtables.
+        Has the same semantics, as `sort` method.
+        """
         self = self.maybe_copy(return_self=inplace)
 
         # Parse parameters into the similar list structure
@@ -347,7 +432,9 @@ class ResourceTable:
         return self
 
     def filter_by_index(self, condition, inplace=True):
-        """ !!. """
+        """ Filter entries in subtables, based on `condition`. Keep only those which evaluate to True.
+        Essentially, the same as `filter`, by also updates `index_values` list.
+        """
         self = self.maybe_copy(return_self=inplace)
 
         data = []
@@ -362,23 +449,46 @@ class ResourceTable:
         self.index_values = index_values
         return self
 
+    def filter_on_index(self, condition, inplace=True):
+        """ Filter subtables and index values, based on `condition`, evaluated on them.
+        Keep only those which evaluate to True.
+        """
+        self = self.maybe_copy(return_self=inplace)
+
+        data = []
+        index_values = []
+        for index_value, subtable in zip(self.index_values, self.split_by_index()):
+            if condition(index_value, subtable):
+                data.extend(subtable.data)
+                index_values.append(index_value)
+
+        self.data = data
+        self.index_values = index_values
+        return self
+
     def aggregate_by_index(self, key, default=0.0, aggregation=max):
-        """ !!. """
+        """ Get aggregates of `key` column for each index value. """
         result = []
         for subtable in self.split_by_index():
             value = subtable.aggregate(key=key, default=default, aggregation=aggregation)
             result.append(value)
         return result
 
+
     # Display
     def __str__(self):
         return repr('\n'.join([str(entry) for entry in self.data]))
 
     def to_format_data(self, resource, terminal, process_memory_format, device_memory_format):
-        """ !!. """
+        """ Create a string template and data for a given `resource` column from entire table.
+        Works by aggregation information in the `resource` column and making string from it.
+        For more information about formatting refer to `ResourceTable.format` method.
+
+        TODO: can actually create a `ResourceEntry` instance and use its `to_format_data` method.
+        """
         _ = process_memory_format, device_memory_format
 
-        template = None
+        template = '{0}'
         data = None
 
         if resource == Resource.DEVICE_SHORT_ID:
@@ -401,6 +511,8 @@ class ResourceTable:
         """ !!. """
         default_data = [''] * 5
         subtables = self.split_by_index()
+        kwargs = {'process_memory_format' : process_memory_format,
+                  'device_memory_format' : device_memory_format}
 
         lines = [[] for _ in range(1 + len(self))]
         for column in formatter.included_only:
@@ -413,24 +525,19 @@ class ResourceTable:
 
             # Table header: names of the columns
             if add_header:
-                header_template, header_data = resource.to_format_data(terminal=terminal,
-                                                                    process_memory_format=process_memory_format,
-                                                                    device_memory_format=device_memory_format)
+                header_template, header_data = resource.to_format_data(terminal=terminal, **kwargs)
                 templates.append(header_template)
                 data.append(header_data)
 
             # Body of the table: add sublines for each table entry
             for subtable in subtables:
                 for i, entry in enumerate(subtable):
-                    template, data_ = entry.to_format_data(resource=resource, terminal=terminal,
-                                                           process_memory_format=process_memory_format,
-                                                           device_memory_format=device_memory_format)
+                    template, data_ = entry.to_format_data(resource=resource, terminal=terminal, **kwargs)
 
                     if aggregate and i == 0:
                         remaining_table = subtable[1:]
                         template_, data__ = remaining_table.to_format_data(resource=resource, terminal=terminal,
-                                                                           process_memory_format=process_memory_format,
-                                                                           device_memory_format=device_memory_format)
+                                                                           **kwargs)
                         template = template_ if template_ is not None else template
                         data_ = data__ if data__ is not None else data_
 
@@ -444,8 +551,11 @@ class ResourceTable:
             # Modify header template to match the templates of rows
             if add_header:
                 if templates[0] is None:
-                    templates[0] = max(templates[1:], key=len)
-                if 'DELIMITER' not in resource.name:
+                    if len(templates) > 1:
+                        templates[0] = max(templates[1:], key=len)
+                    else:
+                        templates[0] = '{0}'
+                if 'TABLE_DELIMITER' not in resource.name:
                     if underline_header:
                         templates[0] = terminal.underline + templates[0]
                     if bold_header:

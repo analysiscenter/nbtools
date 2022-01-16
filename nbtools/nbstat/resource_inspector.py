@@ -264,8 +264,10 @@ class ResourceInspector:
         process_table = self.get_process_table()
 
         #
-        table = ResourceTable.merge(process_table, device_process_table,
-                                    self_key=Resource.PY_PID, other_key=Resource.DEVICE_PROCESS_PID)
+        table = process_table
+        if device_process_table:
+            table = ResourceTable.merge(table, device_process_table,
+                                        self_key=Resource.PY_PID, other_key=Resource.DEVICE_PROCESS_PID)
         if notebook_table:
             table.update(notebook_table, self_key=Resource.PY_KERNEL, other_key=Resource.PY_KERNEL, inplace=True)
 
@@ -273,14 +275,17 @@ class ResourceInspector:
         if sort:
             table.sort(key=Resource.PY_CREATE_TIME, reverse=False)
         if only_device_processes:
-            function = lambda entry: (entry[Resource.DEVICE_ID] is not None)
-            table.filter(function, inplace=True)
+            if device_process_table:
+                function = lambda entry: (entry[Resource.DEVICE_ID] is not None)
+                table.filter(function, inplace=True)
+            else:
+                table = ResourceTable()
 
         #
         table.set_index(Resource.PY_PATH, inplace=True)
         if sort:
             table.sort_by_index(key=Resource.PY_CREATE_TIME, aggregation=sum)
-        if at_least_one_device:
+        if device_process_table and at_least_one_device:
             function = lambda entry: (entry[Resource.DEVICE_ID] is not None)
             table.filter_by_index(function, inplace=True)
         return table
@@ -336,4 +341,8 @@ class ResourceInspector:
         if add_supheader:
             lines = self.add_supheader(lines, terminal=terminal,
                                        underline=underline_supheader, bold=bold_supheader, separate=separate_supheader)
+
+        if not table:
+            placeholder = true_rjust(terminal.bold + 'No entries to display!' + terminal.normal, true_len(lines[-1]))
+            lines[-1] = placeholder
         return '\n'.join(lines)
