@@ -58,6 +58,9 @@ def parse_args(name):
     parser.add_argument('-i', '--interval', '-n', '--watch', nargs='?', type=float, default=0,
                         help='!!.')
 
+    parser.add_argument('-f', action='store_true', default=False, dest='full_notebooks', help='!!.')
+    parser.add_argument('-F', action='store_true', default=False, dest='all_processes', help='!!.')
+
     parser.add_argument('--show-all', action='store_true', default=False, help='!!.')
     parser.add_argument('--show', nargs='*', default=[], help='!!.')
     parser.add_argument('--hide', nargs='*', default=[], help='!!.')
@@ -79,6 +82,13 @@ def parse_args(name):
     if args['add_separator'] is False:
         args['separate_supheader'] = False
         args['separate_header'] = False
+
+    if args.pop('full_notebooks'):
+        args['only_device_processes'] = False
+        args['at_least_one_device'] = True
+    if args.pop('all_processes'):
+        args['only_device_processes'] = False
+        args['at_least_one_device'] = False
 
     _ = name
 

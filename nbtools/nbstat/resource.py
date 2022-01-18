@@ -20,7 +20,7 @@ class Resource(Enum):
     Entries are collected into `ResourceTables`, which provide methods to beautifully format their data.
     Refer to those classes for continuation of the usage logic of Resources.
 
-    Using this enumeration makes sure that the same named unique constants are used throughout the code base.
+    Using the enumeration makes sure that the same named unique constants are used throughout the code base.
     Nevetheless, `parse_alias` method makes sure that we can convert string like `'device_util'` to a correct Resource.
     It comes handy when we get strings from command line, and we use it to process every key that can come from user.
 
@@ -32,10 +32,11 @@ class Resource(Enum):
     As all `Enum`s, does not work well with `autoreload` Jupyter magic.
 
 
-    TODO: a possible improvement of the logic is to use values not only for aliases, but to point out the
+    TODO: a potential improvement of the logic is to use values not only for aliases, but to point out the
     resources to collect for complex columns, which are not fetched themselves, but rely on other collected resources.
     For example, the `DEVICE_SHORT_ID` requires the `DEVICE_ID` and we can define it here instead of
     the corresponding if-clause in the `ResourceInspector.get_device_table`.
+    TODO: add encoder/decoder utilization
     """
     # Possible columns in python-table: notebooks and python scripts
     PY_PROCESS = auto()
@@ -100,7 +101,7 @@ class Resource(Enum):
             string = 'PROCESS NAME'
         elif self in [Resource.PY_TYPE, Resource.PY_PID, Resource.PY_SELFPID,
                           Resource.PY_STATUS, Resource.PY_CREATE_TIME, Resource.PY_KERNEL]:
-            style = terminal.white
+            style = terminal.normal
 
         # Process resources
         elif self in [Resource.PY_RSS, Resource.PY_CPU]:

@@ -44,7 +44,10 @@ pid_to_name = pid_to_name_linux if platform.system() == 'Linux' else pid_to_name
 
 
 class ResourceInspector:
-    """ !!. """
+    """ !!.
+
+    TODO: can add explicit __delete__ to call nvidia_smi.nvmlShutdown(), if we ever have problems with that
+    """
     def __init__(self, formatter):
         self.formatter = formatter
         self._device_handles = None
@@ -258,15 +261,22 @@ class ResourceInspector:
 
 
         if sort:
-            # Custom sort for nbview. Create multiple flags for sorting
+            # Custom sort for nbstat. Create multiple flags, use them as tuple-key for sorting
             is_parent = lambda entry: entry[Resource.PY_PID] == entry[Resource.PY_SELFPID]
             table.add_column('is_parent', is_parent)
 
-            has_device = lambda entry: entry[Resource.DEVICE_ID] is not None
-            table.add_column('has_device', has_device)
+            key = ['is_parent', Resource.PY_CREATE_TIME]
+            reverse = [True, False]
 
-            table.sort(key=['is_parent', 'has_device', Resource.PY_CREATE_TIME],
-                       reverse=[True, True, False])
+            if device_process_table:
+                has_device = lambda entry: entry[Resource.DEVICE_ID] is not None
+                table.add_column('has_device', has_device)
+
+                key.insert(1, 'has_device')
+                reverse.insert(1, True)
+
+            table.sort(key=key, reverse=reverse)
+
 
         if only_device_processes:
             if device_process_table:
@@ -315,7 +325,7 @@ class ResourceInspector:
         timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
         driver_version = '.'.join(nvidia_smi.nvmlSystemGetDriverVersion().decode().split('.')[:-1])
         cuda_version = nvidia_smi.nvmlSystemGetNVMLVersion().decode()[:4]
-        supheader = f'{timestamp}   Driver Version: {driver_version}   CUDA Version:{cuda_version}'
+        supheader = f'{timestamp}   Driver Version: {driver_version}   CUDA Version: {cuda_version}'
 
         if underline:
             supheader = terminal.underline + supheader
@@ -333,14 +343,14 @@ class ResourceInspector:
         lines.insert(0, supheader)
 
         if separate:
-            lines.insert(1, '-' * true_len(supheader))
+            lines.insert(1, terminal.separator_symbol * true_len(supheader))
         return lines
 
     def get_view(self, name='nbstat', terminal=None, index_condition=None,
                  sort=True, only_device_processes=True, at_least_one_device=True,
-                 add_supheader=True, underline_supheader=True, bold_supheader=True, separate_supheader=True,
+                 add_supheader=True, underline_supheader=True, bold_supheader=True, separate_supheader=False,
                  add_header=True, underline_header=True, bold_header=False, separate_header=True,
-                 aggregate=False, add_separator=True, separator='-', hide_similar=True,
+                 add_separator=True, separator='—', hide_similar=True,
                  process_memory_format='GB', device_memory_format='MB'):
         """ !!. """
         if name.startswith('nb'):
@@ -357,11 +367,14 @@ class ResourceInspector:
             function = lambda index_value, _: bool(re.search(index_condition, str(index_value)))
             table.filter_on_index(function, inplace=True)
 
+        # Modify terminal. TODO: move to a separate utility
         terminal = terminal or COLORS
-        lines = table.format(terminal=terminal, formatter=self.formatter, aggregate=aggregate,
+        terminal.separator_symbol = terminal.bold + separator + terminal.normal
+
+        lines = table.format(terminal=terminal, formatter=self.formatter,
                              add_header=add_header, underline_header=underline_header,
                              bold_header=bold_header, separate_header=separate_header,
-                             add_separator=add_separator, separator=separator, hide_similar=hide_similar,
+                             add_separator=add_separator, hide_similar=hide_similar,
                              process_memory_format=process_memory_format, device_memory_format=device_memory_format)
 
         if add_supheader:

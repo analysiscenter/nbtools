@@ -57,7 +57,7 @@ class ResourceEntry(dict):
 
         # Process resources
         elif resource == Resource.PY_CPU:
-            data = self[Resource.PY_PROCESS].cpu_percent(interval=kwargs.get('interval', 0.01))
+            data = self[Resource.PY_PROCESS].cpu_percent()
             data = round(data)
 
             if data > 30:
@@ -77,7 +77,8 @@ class ResourceEntry(dict):
                 string = f'{device_name} {terminal.cyan}[{data}]'
 
         elif resource == Resource.DEVICE_SHORT_ID:
-            data = self.get(Resource.DEVICE_ID, None) or default_string
+            data = self.get(Resource.DEVICE_ID, None)
+            data = data if data is not None else default_string
             string = f'[{data}]'
 
         # Device resources
@@ -508,36 +509,81 @@ class ResourceTable:
     def __str__(self):
         return repr('\n'.join([str(entry) for entry in self.data]))
 
-    def to_format_data(self, resource, terminal, process_memory_format, device_memory_format):
+    def to_format_data(self, resource, terminal, **kwargs):
         """ Create a string template and data for a given `resource` column from entire table.
         Works by aggregation information in the `resource` column and making string from it.
         For more information about formatting refer to `ResourceTable.format` method.
 
-        TODO: can actually create a `ResourceEntry` instance and use its `to_format_data` method.
+        TODO: not used currently, here to show the idea
         """
-        _ = process_memory_format, device_memory_format
-
-        template = '{0}'
-        data = None
+        style, string = None, None
 
         if resource == Resource.DEVICE_SHORT_ID:
             data = self.aggregate(Resource.DEVICE_ID, default=None, aggregation=list)
             data = [str(item) for item in sorted(set(data)) if item is not None]
-            data = ', '.join(data)
 
-        if template is not None:
-            template = template + terminal.normal
-        if data is not None:
-            data = data if isinstance(data, list) else [data]
+            style = ''
+            string = f'[{", ".join(data) or "-"}]'
+        else:
+            # Works for most float-resources: sum over all elements of the table
+            data = self.aggregate(resource, default=0.0, aggregation=sum)
+            entry = ResourceEntry({resource : data})
+            string, style = entry.to_format_data(resource, terminal, **kwargs)
 
-        return template, data
+        return string, style
 
 
-    def format(self, terminal, formatter, aggregate=False,
-               add_header=True, underline_header=True, bold_header=True, separate_header=True,
-               add_separator=True, separator='-', hide_similar=True,
+    def format(self, terminal, formatter, hide_similar=True,
+               add_header=True, underline_header=True, bold_header=True, separate_header=True, add_separator=True,
                process_memory_format='GB', device_memory_format='MB'):
-        """ !!. """
+        """ Create a colored textual representation of a table.
+
+        For each element of `formatter`, that has the `include` flag set to True, we create a column.
+        Each column consists of header (optional), body (info from the actual table entries), and separators (optional).
+            - each column represents a Resource, and by knowing it we can compute the `style` and `name` of this column.
+            That is done by the `Resource.to_format_data` method. For most resources, `style` is a color or
+            text formatting, and it is enough to format the string from entries.
+            The header string is produced by (`style` + `name`).
+
+            - then we iterate over entries in the table. Each entry is requested to create a `style` and `string` for
+            current resource: that is done by the `ResourceEntry.to_format_data` method.
+            Note that we can't use just the resource and its value from the entry to create the `string`, as some of the
+            columns require multiple items: for example, device memory requires current and total values.
+            `style`, returned by the entry, can completely override the style from the Resource, but for the most cases,
+            it is empty or just adds bold/underlines.
+            The overall string for the entry is produced by (`main_style` + `entry_style` + `string`).
+
+        After getting all the data for a column, we justify it so all the elements have the same width.
+        This process is complicated by the fact that most of the strings are colored / formatted, so we use custom
+        functions instead of `str` methods. Finally, we add separators to the table, if needed.
+
+        We rely on `formatter` for getting the structure of a table instead of looking at the present columns,
+        as some of the table elements are more complicated than just retrieving the resource value and formatting it.
+
+        Parameters
+        ----------
+        terminal : blessed.Terminal
+            Terminal to use for colors and text formatting symbols.
+        formatter : ResourceFormatter
+            Formatter to get the structure of a table, as well as additional display parameters for each of them.
+        hide_similar : bool
+            Whether to allow some of the elements to be hidden.
+            For example, the name of the process in all rows after the first.
+        add_header, underline_header, bold_header, separate_header : bool
+            Parameters of table header.
+        add_separator : bool
+            Whether to separate indexed subtables with table separators.
+        process_memory_format, device_memory_format : {'KB', 'MB', 'GB}
+            Memory unit to use for representation process RSS / device memory taken.
+
+        TODO: a potential improvement is to use bold_normal only for table elements.
+        TODO: a potential improvement is to add `limit` parameter to show no more lines for each
+        index value than requested, ending the subtable representation with aggregation of remaining processes.
+        All of the necessary functions are already implemented: all we need to do is to add more cases to the switch in
+        `ResourceTable.to_format_data` and call it here.
+        TODO: a potential improvement is to add capability to handle multi-line strings for individual resources:
+        that would require transposing the loop of lines creation, but overall not that hard.
+        """
         subtables = self.split_by_index()
         kwargs = {'process_memory_format' : process_memory_format,
                   'device_memory_format' : device_memory_format}
@@ -547,7 +593,9 @@ class ResourceTable:
             # Retrieve parameters of the column display
             resource = column_dict['resource']
             hidable, min_width = column_dict.get('hidable', False), column_dict.get('min_width', 0)
-            column_kwargs = {**kwargs, **{key : value for key, value in column_dict.items() if key != 'resource'}}
+            column_kwargs = {**kwargs,
+                             **{key : value for key, value in column_dict.items()
+                                if key != 'resource'}}
 
             styles, strings = [], []
 
@@ -567,17 +615,20 @@ class ResourceTable:
                     style, string = entry.to_format_data(resource=resource, terminal=terminal, **column_kwargs)
 
                     # Changes based on the position of entry
-                    if aggregate and i == 0:
+                    if hide_similar and hidable and i > 0:
+                        style, string = '', ''
+
+                    if False and i: # pylint: disable=condition-evals-to-constant
+                        # TODO: aggregate info by using `aggregate` method
+                        # for a given resource and create a ResourceEntry out of it to make style/string
                         remaining_table = subtable[1:]
                         style, string = remaining_table.to_format_data(resource=resource, terminal=terminal,
                                                                        **column_kwargs)
-                    if hide_similar and hidable and i > 0:
-                        style, string = '', ''
 
                     styles.append(style)
                     strings.append(string)
 
-            # Modify header style
+            # Modify header style: if any entry used bold, use it in the header as well
             if add_header:
                 if len(styles) > 1:
                     styles[0] += terminal.bold * max(terminal.bold in style for style in styles)
@@ -604,11 +655,11 @@ class ResourceTable:
             if (add_header and separate_header) and add_separator:
                 separator_indices = separator_indices[::-1]
             elif add_header and separate_header:
-                separator_indices = separator_indices[:0]
+                separator_indices = separator_indices[:1]
             else:
                 separator_indices = separator_indices[1:][::-1]
 
-            separator = separator * true_len(lines[0])
+            separator = terminal.separator_symbol * true_len(lines[0])
             for idx in separator_indices:
                 lines.insert(idx, separator)
 
@@ -617,6 +668,6 @@ class ResourceTable:
 
     # Pandas compatibility
     def to_pd(self):
-        """ !!. """
+        """ Convert the table to a `pandas.DataFrame`. """
         import pandas as pd #pylint: disable=import-outside-toplevel
         return pd.DataFrame(self.data)

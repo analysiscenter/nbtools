@@ -21,11 +21,12 @@ class ResourceFormatter(list):
     We also overload `setitem` to change value of `include` flag for a given resource. That provides simple API for
     modifying existing formatters.
     For example, `formatter[Resource.DEVICE_TEMP] = True` turns on the device temperature column, if it is
-    present in the `formatter`. Note that it does not change the order of elements: that allows us to define
+    present in the `formatter`.
+
+    Note that it does not change the order of elements: that is the key feature and allows us to define
     'templates` of table formatters, where some of the elements have `include` flag set to False by default.
-    Changing the value of `include` flag adds them in the table in desired position.
+    Changing the value of `include` flag adds required resources in the table in pre-defined positions.
     Refer to `NBSTAT_FORMATTER` for example.
-    `update` method allows for setting multiple values at once.
     """
     def __getitem__(self, key):
         key = Resource.parse_alias(key)
