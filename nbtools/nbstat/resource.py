@@ -41,9 +41,10 @@ class Resource(Enum):
     # Possible columns in python-table: notebooks and python scripts
     PY_PROCESS = auto()
     PY_TYPE = auto()
-    PY_NAME = auto()
+    PY_NAME = 'process_name'
     PY_PATH = auto()
     PY_PID = auto()
+    PY_NGID = auto()
     PY_SELFPID = auto()
     PY_CREATE_TIME = auto()
     PY_KERNEL = auto()
@@ -61,7 +62,7 @@ class Resource(Enum):
     DEVICE_TEMP = ['temp', 'temperature']
     DEVICE_POWER_USED = 'power'
     DEVICE_POWER_TOTAL = auto()
-    DEVICE_FAN = ['fan', 'fans']
+    DEVICE_FAN = 'fan'
     DEVICE_UTIL = 'util'
     DEVICE_UTIL_ENC = auto()
     DEVICE_UTIL_DEC = auto()
@@ -69,12 +70,12 @@ class Resource(Enum):
     # Aggregated process info
     DEVICE_PROCESS_N = auto()
     DEVICE_PROCESS_PID = auto()
-    DEVICE_PROCESS_MEMORY_USED = auto()
+    DEVICE_PROCESS_MEMORY_USED = 'process_memory'
 
     # Used for better repr in formatter tables
     TABLE_DELIMITER1 = auto()
     TABLE_DELIMITER2 = auto()
-    DEVICE_SHORT_ID = auto()
+    DEVICE_SHORT_ID = 'short_id'
 
     def __repr__(self):
         return self.name
@@ -143,11 +144,16 @@ class Resource(Enum):
 
 # Dictionary with aliases for each Resource: more aliases can be added by setting values in Enum instead of `auto`
 # Added to the class attributes after its creation so it is not a member of actual enumeration.
-ALIAS_TO_RESOURCE = {}
+ALIAS_TO_RESOURCE, RESOURCE_TO_ALIAS = {}, {}
 for resource in Resource.__members__.values():
     name, aliases = resource.name, resource.value
+    aliases_from_name = [name, name.lower(), name.lower().replace('py_', '')]
+
     aliases = aliases if isinstance(aliases, list) else [aliases]
-    aliases.extend([name, name.lower(), name.lower().replace('py_', '')])
+    aliases = [alias for alias in aliases if not isinstance(alias, int)]
+    aliases = aliases_from_name + aliases
 
     ALIAS_TO_RESOURCE.update({alias : resource for alias in aliases})
+    RESOURCE_TO_ALIAS[resource] = [alias for alias in aliases if isinstance(alias, str)][-1]
 Resource.ALIAS_TO_RESOURCE = ALIAS_TO_RESOURCE
+Resource.RESOURCE_TO_ALIAS = RESOURCE_TO_ALIAS

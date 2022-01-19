@@ -48,7 +48,7 @@ class ResourceEntry(dict):
 
         # Process description
         if resource in [Resource.PY_NAME, Resource.PY_PATH, Resource.PY_TYPE,
-                        Resource.PY_PID, Resource.PY_SELFPID, Resource.PY_STATUS]:
+                        Resource.PY_PID, Resource.PY_NGID, Resource.PY_SELFPID, Resource.PY_STATUS]:
             pass
         elif resource == Resource.PY_CREATE_TIME:
             data = datetime.fromtimestamp(data).strftime("%Y-%m-%d %H:%M:%S")
@@ -57,12 +57,14 @@ class ResourceEntry(dict):
 
         # Process resources
         elif resource == Resource.PY_CPU:
-            data = self[Resource.PY_PROCESS].cpu_percent()
-            data = round(data)
+            process = self[Resource.PY_PROCESS]
+            if process is not None:
+                data = process.cpu_percent()
+                data = round(data)
 
-            if data > 30:
-                style = terminal.bold
-            string = f'{data}%' # don't use the `％` symbol as it is not unit wide
+                if data > 30:
+                    style = terminal.bold
+                string = f'{data}%' # don't use the `％` symbol as it is not unit wide
 
         elif resource == Resource.PY_RSS:
             if data is not None:
@@ -78,8 +80,12 @@ class ResourceEntry(dict):
 
         elif resource == Resource.DEVICE_SHORT_ID:
             data = self.get(Resource.DEVICE_ID, None)
-            data = data if data is not None else default_string
-            string = f'[{data}]'
+            if data is not None:
+                data = data if data is not None else default_string
+                device_name = (self[Resource.DEVICE_NAME]
+                               .replace('NVIDIA', '').replace('RTX', '').replace('GeForce', '')
+                               .replace('  ', ' ').strip())
+                string = f'{device_name} [{data}]'
 
         # Device resources
         elif resource == Resource.DEVICE_MEMORY_USED:
@@ -365,7 +371,8 @@ class ResourceTable:
             for key_, default_, reverse_ in zip(key, default, reverse):
                 key_ = Resource.parse_alias(key_)
                 sign = -1 if reverse_ is True else +1
-                value = entry[key_] if entry[key_] is not None else default_
+                value = entry.get(key_, None)
+                value = value if value is not None else default_
                 result.append(sign * value)
             return tuple(result)
 
@@ -534,7 +541,7 @@ class ResourceTable:
 
 
     def format(self, terminal, formatter, hide_similar=True,
-               add_header=True, underline_header=True, bold_header=True, separate_header=True, add_separator=True,
+               add_header=True, underline_header=True, bold_header=True, separate_header=True, separate_index=True,
                process_memory_format='GB', device_memory_format='MB'):
         """ Create a colored textual representation of a table.
 
@@ -571,7 +578,7 @@ class ResourceTable:
             For example, the name of the process in all rows after the first.
         add_header, underline_header, bold_header, separate_header : bool
             Parameters of table header.
-        add_separator : bool
+        separate_index : bool
             Whether to separate indexed subtables with table separators.
         process_memory_format, device_memory_format : {'KB', 'MB', 'GB}
             Memory unit to use for representation process RSS / device memory taken.
@@ -646,13 +653,13 @@ class ResourceTable:
         lines = [' '.join(line).rstrip() for line in lines]
 
         # Add separators between index values
-        if add_separator or (add_header and separate_header):
+        if separate_index or (add_header and separate_header):
             s, separator_indices = 1 if add_header else 0, []
             for subtable in subtables:
                 separator_indices.append(s)
                 s += len(subtable)
 
-            if (add_header and separate_header) and add_separator:
+            if (add_header and separate_header) and separate_index:
                 separator_indices = separator_indices[::-1]
             elif add_header and separate_header:
                 separator_indices = separator_indices[:1]

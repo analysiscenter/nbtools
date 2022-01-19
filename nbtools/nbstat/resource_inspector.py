@@ -4,6 +4,7 @@ import re
 import json
 import time
 import platform
+import linecache
 
 import psutil
 import requests
@@ -12,13 +13,14 @@ import nvidia_smi
 
 from .resource import Resource
 from .resource_table import ResourceTable
-from .utils import COLORS, true_len, true_rjust
+from .utils import COLORS, true_len, true_rjust, format_memory
 
 
 KERNEL_ID_SEARCHER   = re.compile('kernel-(.*).json').search
+VSCODE_KEY_SEARCHER  = re.compile('key=b"(.*)"').search
 SCRIPT_NAME_SEARCHER = re.compile('python.* (.*).py').search
 
-
+SYSTEM = platform.system()
 
 def pid_to_name_generic(pid):
     """ !!. """
@@ -34,18 +36,37 @@ def pid_to_name_linux(pid):
     ~20% speed-up, compared to the `psutil` version.
     """
     try:
-        with open(f'/proc/{pid}/status') as file:
-            name = file.readline().split()[1]
+        line = linecache.getline(f'/proc/{pid}/status', 1)
+        name = line.strip().split()[1]
     except Exception: #pylint: disable=broad-except
         name = ''
     return name
 
-pid_to_name = pid_to_name_linux if platform.system() == 'Linux' else pid_to_name_generic
+pid_to_name = pid_to_name_linux if SYSTEM == 'Linux' else pid_to_name_generic
+
+
+def pid_to_ngid_generic(pid):
+    """ !!. """
+    return pid
+
+def pid_to_ngid_linux(pid):
+    """ !!. """
+    try:
+        line = linecache.getline(f'/proc/{pid}/status', 5)
+        ngid = line.strip().split()[1]
+        ngid = int(ngid)
+    except Exception: #pylint: disable=broad-except
+        ngid = pid
+    return ngid or pid
+
+pid_to_ngid = pid_to_ngid_linux if SYSTEM == 'Linux' else pid_to_ngid_generic
 
 
 class ResourceInspector:
     """ !!.
 
+    TODO: use /proc/pid/status to get host-PID if run in container
+    TODO: correct working with VSCode
     TODO: can add explicit __delete__ to call nvidia_smi.nvmlShutdown(), if we ever have problems with that
     """
     def __init__(self, formatter):
@@ -180,6 +201,7 @@ class ResourceInspector:
                 if pid not in self.pid_to_process:
                     self.pid_to_process[pid] = psutil.Process(pid)
                 process = self.pid_to_process[pid]
+                pid = process.pid
 
                 with process.oneshot():
                     # Command used to start the Python interpreter
@@ -187,38 +209,49 @@ class ResourceInspector:
 
                     # Determine the type, name and path of the python process
                     kernel_id = KERNEL_ID_SEARCHER(cmdline)
+                    vscode_key = VSCODE_KEY_SEARCHER(cmdline)
+                    script_name = SCRIPT_NAME_SEARCHER(cmdline)
+
                     if kernel_id:
                         type_ = 'notebook'
-                        name = None
+                        name = 'zombie-notebook'
                         path = None
                         kernel_id = kernel_id.group(1)
                         status = process.status()
-
+                    elif vscode_key:
+                        type_ = 'notebook'
+                        name = 'vscode'
+                        path = process.cwd()
+                        kernel_id = vscode_key.group(1)
+                        status = process.status()
+                    elif script_name:
+                        type_ = 'script'
+                        name = script_name.group(1) + '.py'
+                        path = os.path.join(process.cwd(), name)
+                        kernel_id = None
+                        status = process.status()
                     else:
-                        script_name = SCRIPT_NAME_SEARCHER(cmdline)
-                        if script_name:
-                            type_ = 'script'
-                            name = script_name.group(1) + '.py'
-                            path = os.path.join(process.cwd(), name)
-                            kernel_id = None
-                            status = process.status()
-                        else:
-                            type_ = 'unknown'
-                            name = 'unknown'
-                            path = process.cwd()
-                            kernel_id = None
-                            status = process.status()
+                        type_ = 'unknown'
+                        name = 'unknown'
+                        path = process.cwd()
+                        kernel_id = None
+                        status = process.status()
 
+                    #
                     ppid = process.ppid()
                     if ppid in python_pids:
-                        type_ += '-subprocess'
+                        type_ = 'subprocess'
+                        selfpid = ppid
+                    elif 'containerd' in pid_to_name(ppid):
+                        type_ = 'containerd'
                         selfpid = ppid
                     else:
-                        selfpid = process.pid
+                        selfpid = pid
 
                     # Fill in the basic info
                     process_info = {
-                        Resource.PY_PID : process.pid,
+                        Resource.PY_PID : pid,
+                        Resource.PY_NGID : pid_to_ngid(pid),
                         Resource.PY_SELFPID : selfpid,
                         Resource.PY_TYPE : type_,
                         Resource.PY_NAME : name,
@@ -229,6 +262,7 @@ class ResourceInspector:
                         Resource.PY_PROCESS : process
                     }
 
+                    # Gather resource info
                     if self.formatter.get(Resource.PY_CPU, False):
                         process_info[Resource.PY_CPU] = process.cpu_percent()
 
@@ -244,7 +278,7 @@ class ResourceInspector:
 
 
     # Aggregate multiple ResourceTables into more representative tables
-    def get_nbstat_table(self, sort=True, only_device_processes=True, at_least_one_device=True):
+    def get_nbstat_table(self, sort=True, verbose=0):
         """ !!. """
         #
         _, device_process_table = self.get_device_table(True)
@@ -255,43 +289,32 @@ class ResourceInspector:
         table = process_table
         if device_process_table:
             table = ResourceTable.merge(table, device_process_table,
-                                        self_key=Resource.PY_PID, other_key=Resource.DEVICE_PROCESS_PID)
+                                        self_key=Resource.PY_NGID, other_key=Resource.DEVICE_PROCESS_PID)
         if notebook_table:
             table.update(notebook_table, self_key=Resource.PY_KERNEL, other_key=Resource.PY_KERNEL, inplace=True)
 
 
         if sort:
-            # Custom sort for nbstat. Create multiple flags, use them as tuple-key for sorting
+            # Custom sort for nbstat
             is_parent = lambda entry: entry[Resource.PY_PID] == entry[Resource.PY_SELFPID]
             table.add_column('is_parent', is_parent)
 
-            key = ['is_parent', Resource.PY_CREATE_TIME]
-            reverse = [True, False]
+            table.sort(key=['is_parent', Resource.DEVICE_ID, Resource.PY_CREATE_TIME],
+                       reverse=[True, False, False], default=[0.0, 999, 0.0])
 
-            if device_process_table:
-                has_device = lambda entry: entry[Resource.DEVICE_ID] is not None
-                table.add_column('has_device', has_device)
-
-                key.insert(1, 'has_device')
-                reverse.insert(1, True)
-
-            table.sort(key=key, reverse=reverse)
-
-
-        if only_device_processes:
-            if device_process_table:
-                function = lambda entry: (entry[Resource.DEVICE_ID] is not None or \
-                                          entry[Resource.PY_PID] == entry[Resource.PY_SELFPID])
-                table.filter(function, inplace=True)
-            else:
-                table = ResourceTable()
+        #
+        if verbose == 0:
+            function = lambda entry: (entry.get(Resource.DEVICE_ID) is not None or \
+                                      entry[Resource.PY_PID] == entry[Resource.PY_SELFPID])
+            table.filter(function, inplace=True)
 
         #
         table.set_index(Resource.PY_PATH, inplace=True)
         if sort:
-            table.sort_by_index(key=Resource.PY_CREATE_TIME, aggregation=sum)
-        if device_process_table and at_least_one_device:
-            function = lambda entry: (entry[Resource.DEVICE_ID] is not None)
+            table.sort_by_index(key=Resource.PY_CREATE_TIME, aggregation=min)
+
+        if verbose <= 1:
+            function = lambda entry: (entry.get(Resource.DEVICE_ID) is not None)
             table.filter_by_index(function, inplace=True)
         return table
 
@@ -320,42 +343,73 @@ class ResourceInspector:
 
 
     # Make formatted visualization of tables
+    def add_line(self, lines, parts, terminal, position, separator_position, underline, bold):
+        """ !!. """
+        if underline:
+            parts = [terminal.underline + part for part in parts]
+        if bold:
+            parts = [terminal.bold + part for part in parts]
+        parts = [part + terminal.normal for part in parts]
+        added_line = '    '.join(parts)
+
+        added_line_width = true_len(added_line)
+        table_width = true_len(lines[0])
+
+        if added_line_width <= table_width:
+            added_line = true_rjust(added_line, table_width)
+        else:
+            lines = [true_rjust(line, added_line_width) for line in lines]
+        lines.insert(position, added_line)
+
+        if separator_position is not None:
+            lines.insert(separator_position, terminal.separator_symbol * true_len(added_line))
+        return lines
+
     def add_supheader(self, lines, terminal, underline=True, bold=True, separate=True):
         """ !!. """
         timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
         driver_version = '.'.join(nvidia_smi.nvmlSystemGetDriverVersion().decode().split('.')[:-1])
         cuda_version = nvidia_smi.nvmlSystemGetNVMLVersion().decode()[:4]
-        supheader = f'{timestamp}   Driver Version: {driver_version}   CUDA Version: {cuda_version}'
 
-        if underline:
-            supheader = terminal.underline + supheader
-        if bold:
-            supheader = terminal.bold + supheader
-        supheader = supheader + terminal.normal
+        parts = [
+            timestamp,
+            f'Driver Version: {driver_version}',
+            f'CUDA Version: {cuda_version}'
+        ]
+        lines = self.add_line(lines=lines, parts=parts, terminal=terminal,
+                              position=0, separator_position=1 if separate else None,
+                              underline=underline, bold=bold)
+        return lines
 
-        supheader_width = true_len(supheader)
-        table_width = true_len(lines[0])
+    def add_footnote(self, lines, terminal, underline=True, bold=True, separate=True, process_memory_format='GB'):
+        """ !!. """
+        vm = psutil.virtual_memory()
+        vm_used, unit = format_memory(vm.used, process_memory_format)
+        vm_total, unit = format_memory(vm.total, process_memory_format)
+        n_digits = len(str(vm_total))
 
-        if supheader_width <= table_width:
-            supheader = true_rjust(supheader, table_width)
-        else:
-            lines = [true_rjust(line, supheader_width) for line in lines]
-        lines.insert(0, supheader)
+        parts = [
+            f'{terminal.bold + terminal.cyan}SYSTEM CPU: {psutil.cpu_percent():6}%',
+            f'{terminal.bold + terminal.cyan}SYSTEM RSS: {vm_used:>{n_digits}} / {vm_total} {unit}'
+        ]
 
+        lines = self.add_line(lines=lines, parts=parts, terminal=terminal,
+                              position=len(lines), separator_position=None,
+                              underline=underline, bold=bold)
         if separate:
-            lines.insert(1, terminal.separator_symbol * true_len(supheader))
+            lines.insert(-1, ' ')
         return lines
 
     def get_view(self, name='nbstat', terminal=None, index_condition=None,
-                 sort=True, only_device_processes=True, at_least_one_device=True,
+                 sort=True, verbose=0,
                  add_supheader=True, underline_supheader=True, bold_supheader=True, separate_supheader=False,
                  add_header=True, underline_header=True, bold_header=False, separate_header=True,
-                 add_separator=True, separator='—', hide_similar=True,
+                 add_footnote=False, underline_footnote=False, bold_footnote=False, separate_footnote=True,
+                 separate_index=True, separator='—', hide_similar=True,
                  process_memory_format='GB', device_memory_format='MB'):
         """ !!. """
         if name.startswith('nb'):
-            table = self.get_nbstat_table(sort=sort, only_device_processes=only_device_processes,
-                                          at_least_one_device=at_least_one_device)
+            table = self.get_nbstat_table(sort=sort, verbose=verbose)
         elif name.startswith('device'):
             table = self.get_devicestat_table()
         elif name.startswith('gpu'):
@@ -374,12 +428,16 @@ class ResourceInspector:
         lines = table.format(terminal=terminal, formatter=self.formatter,
                              add_header=add_header, underline_header=underline_header,
                              bold_header=bold_header, separate_header=separate_header,
-                             add_separator=add_separator, hide_similar=hide_similar,
+                             separate_index=separate_index, hide_similar=hide_similar,
                              process_memory_format=process_memory_format, device_memory_format=device_memory_format)
 
         if add_supheader:
             lines = self.add_supheader(lines, terminal=terminal,
                                        underline=underline_supheader, bold=bold_supheader, separate=separate_supheader)
+        if add_footnote:
+            lines = self.add_footnote(lines, terminal=terminal,
+                                      underline=underline_footnote, bold=bold_footnote, separate=separate_footnote,
+                                      process_memory_format=process_memory_format)
 
         if not table:
             placeholder = true_rjust(terminal.bold + 'No entries to display!' + terminal.normal, true_len(lines[-1]))

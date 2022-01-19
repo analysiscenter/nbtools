@@ -107,6 +107,23 @@ class ResourceFormatter(list):
             formatter.pop()
         return formatter
 
+    @property
+    def names(self):
+        """ !!. """
+        return [Resource.RESOURCE_TO_ALIAS[item['resource']] for item in self]
+
+    @property
+    def included_names(self):
+        """ !!. """
+        return [Resource.RESOURCE_TO_ALIAS[item['resource']] for item in self.included_only
+                if 'TABLE_DELIMITER' not in item['resource'].name]
+
+    @property
+    def excluded_names(self):
+        """ !!. """
+        return [Resource.RESOURCE_TO_ALIAS[item['resource']] for item in self
+                if item['include'] is False and 'TABLE_DELIMITER' not in item['resource'].name]
+
 
 NBSTAT_FORMATTER = ResourceFormatter([
     # Notebook/script name
@@ -117,6 +134,7 @@ NBSTAT_FORMATTER = ResourceFormatter([
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
     {'resource' : Resource.PY_TYPE, 'include' : True},
     {'resource' : Resource.PY_PID, 'include' : True},
+    {'resource' : Resource.PY_NGID, 'include' : False},
     {'resource' : Resource.PY_SELFPID, 'include' : False},
     {'resource' : Resource.PY_KERNEL, 'include' : False},
     {'resource' : Resource.PY_STATUS, 'include' : False, 'min_width' : 10},
@@ -166,6 +184,7 @@ DEVICESTAT_FORMATTER = ResourceFormatter([
     # Process info
     {'resource' : Resource.PY_TYPE, 'include' : False},
     {'resource' : Resource.PY_PID, 'include' : False},
+    {'resource' : Resource.PY_NGID, 'include' : False},
     {'resource' : Resource.PY_SELFPID, 'include' : False},
     {'resource' : Resource.PY_KERNEL, 'include' : False},
     {'resource' : Resource.PY_STATUS, 'include' : False},
