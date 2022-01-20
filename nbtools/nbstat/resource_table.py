@@ -47,17 +47,17 @@ class ResourceEntry(dict):
         data = self.get(resource, None)
 
         # Process description
-        if resource in [Resource.PY_NAME, Resource.PY_PATH, Resource.PY_TYPE,
-                        Resource.PY_PID, Resource.PY_NGID, Resource.PY_SELFPID, Resource.PY_STATUS]:
+        if resource in [Resource.NAME, Resource.PATH, Resource.TYPE,
+                        Resource.PID, Resource.NGID, Resource.HOST_PID, Resource.PYTHON_PPID, Resource.STATUS]:
             pass
-        elif resource == Resource.PY_CREATE_TIME:
+        elif resource == Resource.CREATE_TIME:
             data = datetime.fromtimestamp(data).strftime("%Y-%m-%d %H:%M:%S")
-        elif resource == Resource.PY_KERNEL:
+        elif resource == Resource.KERNEL:
             data = data.split('-')[0] if data is not None else 'N/A'
 
         # Process resources
-        elif resource == Resource.PY_CPU:
-            process = self[Resource.PY_PROCESS]
+        elif resource == Resource.CPU:
+            process = self[Resource.PROCESS]
             if process is not None:
                 data = process.cpu_percent()
                 data = round(data)
@@ -66,7 +66,7 @@ class ResourceEntry(dict):
                     style = terminal.bold
                 string = f'{data}%' # don't use the `％` symbol as it is not unit wide
 
-        elif resource == Resource.PY_RSS:
+        elif resource == Resource.RSS:
             if data is not None:
                 rounded, unit = format_memory(data, format=kwargs['process_memory_format'])
                 data = f'{rounded} {unit}'

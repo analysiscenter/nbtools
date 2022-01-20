@@ -109,49 +109,48 @@ class ResourceFormatter(list):
 
     @property
     def names(self):
-        """ !!. """
+        """ Aliases of all resources in `self`. """
         return [Resource.RESOURCE_TO_ALIAS[item['resource']] for item in self]
 
     @property
     def included_names(self):
-        """ !!. """
+        """ Aliases of included resources in `self`. """
         return [Resource.RESOURCE_TO_ALIAS[item['resource']] for item in self.included_only
                 if 'TABLE_DELIMITER' not in item['resource'].name]
 
     @property
     def excluded_names(self):
-        """ !!. """
+        """ Aliases of not included resources in `self`. """
         return [Resource.RESOURCE_TO_ALIAS[item['resource']] for item in self
                 if item['include'] is False and 'TABLE_DELIMITER' not in item['resource'].name]
 
 
 NBSTAT_FORMATTER = ResourceFormatter([
     # Notebook/script name
-    {'resource' : Resource.PY_NAME, 'include' : True, 'hidable': True},
-    {'resource' : Resource.PY_PATH, 'include' : False, 'hidable': True},
+    {'resource' : Resource.NAME, 'include' : True, 'hidable': True},
+    {'resource' : Resource.PATH, 'include' : False, 'hidable': True},
 
     # Process info
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
-    {'resource' : Resource.PY_TYPE, 'include' : True},
-    {'resource' : Resource.PY_PID, 'include' : True},
-    {'resource' : Resource.PY_NGID, 'include' : False},
-    {'resource' : Resource.PY_SELFPID, 'include' : False},
-    {'resource' : Resource.PY_KERNEL, 'include' : False},
-    {'resource' : Resource.PY_STATUS, 'include' : False, 'min_width' : 10},
+    {'resource' : Resource.TYPE, 'include' : True},
+    {'resource' : Resource.PID, 'include' : True},
+    {'resource' : Resource.NGID, 'include' : False},
+    {'resource' : Resource.PYTHON_PPID, 'include' : False},
+    {'resource' : Resource.KERNEL, 'include' : False},
+    {'resource' : Resource.STATUS, 'include' : False, 'min_width' : 10},
 
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
-    {'resource' : Resource.PY_CREATE_TIME, 'include' : False},
+    {'resource' : Resource.CREATE_TIME, 'include' : False},
 
     # Process resource usage
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
-    {'resource' : Resource.PY_CPU, 'include' : False, 'min_width' : 5},
-    {'resource' : Resource.PY_RSS, 'include' : True, 'min_width' : 8},
+    {'resource' : Resource.CPU, 'include' : False, 'min_width' : 5},
+    {'resource' : Resource.RSS, 'include' : True, 'min_width' : 8},
 
     # Process device usage
     {'resource' : Resource.TABLE_DELIMITER2, 'include' : True},
     {'resource' : Resource.DEVICE_SHORT_ID, 'include' : True},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
-    {'resource' : Resource.DEVICE_MEMORY_USED, 'include' : False},
     {'resource' : Resource.DEVICE_PROCESS_MEMORY_USED, 'include' : True},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
     {'resource' : Resource.DEVICE_UTIL, 'include' : True, 'min_width' : 5},
@@ -173,27 +172,26 @@ DEVICESTAT_FORMATTER = ResourceFormatter([
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
 
     # Individual processes for each device
-    {'resource' : Resource.DEVICE_MEMORY_USED, 'include' : False},
     {'resource' : Resource.DEVICE_PROCESS_MEMORY_USED, 'include' : True},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
 
     # Notebook/script name
-    {'resource' : Resource.PY_NAME, 'include' : True},
+    {'resource' : Resource.NAME, 'include' : True},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
 
     # Process info
-    {'resource' : Resource.PY_TYPE, 'include' : False},
-    {'resource' : Resource.PY_PID, 'include' : False},
-    {'resource' : Resource.PY_NGID, 'include' : False},
-    {'resource' : Resource.PY_SELFPID, 'include' : False},
-    {'resource' : Resource.PY_KERNEL, 'include' : False},
-    {'resource' : Resource.PY_STATUS, 'include' : False},
-    {'resource' : Resource.PY_CREATE_TIME, 'include' : False},
+    {'resource' : Resource.TYPE, 'include' : False},
+    {'resource' : Resource.PID, 'include' : False},
+    {'resource' : Resource.NGID, 'include' : False},
+    {'resource' : Resource.PYTHON_PPID, 'include' : False},
+    {'resource' : Resource.KERNEL, 'include' : False},
+    {'resource' : Resource.STATUS, 'include' : False},
+    {'resource' : Resource.CREATE_TIME, 'include' : False},
 
     # Process resource usage
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
-    {'resource' : Resource.PY_CPU, 'include' : False, 'min_width' : 5},
-    {'resource' : Resource.PY_RSS, 'include' : False, 'min_width' : 10},
+    {'resource' : Resource.CPU, 'include' : False, 'min_width' : 5},
+    {'resource' : Resource.RSS, 'include' : False, 'min_width' : 10},
 
 ])
 
@@ -207,5 +205,4 @@ GPUSTAT_FORMATTER = ResourceFormatter([
     {'resource' : Resource.DEVICE_POWER_USED, 'include' : False},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
     {'resource' : Resource.DEVICE_MEMORY_USED, 'include' : True},
-    {'resource' : Resource.DEVICE_PROCESS_MEMORY_USED, 'include' : False},
 ])

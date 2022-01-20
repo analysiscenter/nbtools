@@ -25,7 +25,7 @@ class Resource(Enum):
     It comes handy when we get strings from command line, and we use it to process every key that can come from user.
 
     Members of this enumeration have prefixes to distinguish their supposed use:
-        - `PY_` to describe Python processes and Jupyter Notebooks properties like name, path, PID
+        - `` to describe Python processes and Jupyter Notebooks properties like name, path, PID
         - `DEVICE_` to describe properties of accelerators like memory taken, temperature, and utilization
         - `TABLE_` to denote elements that are parts of the formatted table.
 
@@ -39,19 +39,20 @@ class Resource(Enum):
     TODO: add encoder/decoder utilization
     """
     # Possible columns in python-table: notebooks and python scripts
-    PY_PROCESS = auto()
-    PY_TYPE = auto()
-    PY_NAME = 'process_name'
-    PY_PATH = auto()
-    PY_PID = auto()
-    PY_NGID = auto()
-    PY_SELFPID = auto()
-    PY_CREATE_TIME = auto()
-    PY_KERNEL = auto()
-    PY_STATUS = auto()
+    PROCESS = auto()
+    TYPE = auto()
+    NAME = 'process_name'
+    PATH = auto()
+    PID = auto()
+    NGID = auto()
+    HOST_PID = auto()
+    PYTHON_PPID = auto()
+    CREATE_TIME = auto()
+    KERNEL = auto()
+    STATUS = auto()
 
-    PY_RSS = auto()
-    PY_CPU = auto()
+    RSS = auto()
+    CPU = auto()
 
     # Possible columns in device-table: information about each device
     DEVICE_ID = auto()
@@ -97,15 +98,15 @@ class Resource(Enum):
         style, string = None, None
 
         # Process description
-        if self == Resource.PY_NAME:
+        if self == Resource.NAME:
             style = terminal.bold
             string = 'PROCESS NAME'
-        elif self in [Resource.PY_TYPE, Resource.PY_PID, Resource.PY_SELFPID,
-                          Resource.PY_STATUS, Resource.PY_CREATE_TIME, Resource.PY_KERNEL]:
+        elif self in [Resource.TYPE, Resource.PID, Resource.PYTHON_PPID,
+                          Resource.STATUS, Resource.CREATE_TIME, Resource.KERNEL]:
             style = terminal.normal
 
         # Process resources
-        elif self in [Resource.PY_RSS, Resource.PY_CPU]:
+        elif self in [Resource.RSS, Resource.CPU]:
             style = terminal.bold + terminal.cyan
 
         # Device description
@@ -138,7 +139,7 @@ class Resource(Enum):
         if style is None:
             style = ''
         if string is None:
-            string = self.name.replace('PY_', '').replace('DEVICE_', '').replace('_USED', '').replace('_', ' ')
+            string = self.name.replace('', '').replace('DEVICE_', '').replace('_USED', '').replace('_', ' ')
         return style, string
 
 
@@ -147,7 +148,7 @@ class Resource(Enum):
 ALIAS_TO_RESOURCE, RESOURCE_TO_ALIAS = {}, {}
 for resource in Resource.__members__.values():
     name, aliases = resource.name, resource.value
-    aliases_from_name = [name, name.lower(), name.lower().replace('py_', '')]
+    aliases_from_name = [name, name.lower()]
 
     aliases = aliases if isinstance(aliases, list) else [aliases]
     aliases = [alias for alias in aliases if not isinstance(alias, int)]
