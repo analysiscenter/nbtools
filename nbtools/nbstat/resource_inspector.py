@@ -65,8 +65,7 @@ pid_to_ngid = pid_to_ngid_linux if SYSTEM == 'Linux' else pid_to_ngid_generic
 class ResourceInspector:
     """ !!.
 
-    TODO: use /proc/pid/status to get host-PID if run in container
-    TODO: correct working with VSCode
+    TODO: correct working with VSCode Jupyter Notebooks
     TODO: can add explicit __delete__ to call nvidia_smi.nvmlShutdown(), if we ever have problems with that
     """
     def __init__(self, formatter):
@@ -288,8 +287,18 @@ class ResourceInspector:
         #
         table = process_table
         if device_process_table:
+            device_pids = device_process_table[Resource.DEVICE_PROCESS_PID]
+
+            def select_pid(entry):
+                pid = entry[Resource.PY_PID]
+                ngid = entry[Resource.PY_NGID]
+                result = ngid if ngid in device_pids else pid
+                return result
+
+            table.add_column('merge_pid', select_pid)
             table = ResourceTable.merge(table, device_process_table,
-                                        self_key=Resource.PY_NGID, other_key=Resource.DEVICE_PROCESS_PID)
+                                        self_key='merge_pid', other_key=Resource.DEVICE_PROCESS_PID)
+
         if notebook_table:
             table.update(notebook_table, self_key=Resource.PY_KERNEL, other_key=Resource.PY_KERNEL, inplace=True)
 
@@ -331,7 +340,7 @@ class ResourceInspector:
         process_table = self.get_process_table()
 
         table = device_table.unroll(inplace=False)
-        table = table.merge(process_table, self_key=Resource.DEVICE_PROCESS_PID, other_key=Resource.PY_PID)
+        table = table.merge(process_table, self_key=Resource.DEVICE_PROCESS_PID, other_key=Resource.PY_NGID)
 
         if notebook_table:
             table.update(notebook_table, self_key=Resource.PY_KERNEL, other_key=Resource.PY_KERNEL, inplace=True)
