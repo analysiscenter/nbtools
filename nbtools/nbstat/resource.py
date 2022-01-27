@@ -44,6 +44,7 @@ class Resource(Enum):
     NAME = 'process_name'
     PATH = auto()
     PID = auto()
+    PPID = auto()
     NGID = auto()
     HOST_PID = auto()
     PYTHON_PPID = auto()

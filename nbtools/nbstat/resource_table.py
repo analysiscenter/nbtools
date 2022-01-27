@@ -47,8 +47,8 @@ class ResourceEntry(dict):
         data = self.get(resource, None)
 
         # Process description
-        if resource in [Resource.NAME, Resource.PATH, Resource.TYPE,
-                        Resource.PID, Resource.NGID, Resource.HOST_PID, Resource.PYTHON_PPID, Resource.STATUS]:
+        if resource in [Resource.NAME, Resource.PATH, Resource.TYPE, Resource.STATUS,
+                        Resource.PID, Resource.PPID, Resource.NGID, Resource.HOST_PID, Resource.PYTHON_PPID]:
             pass
         elif resource == Resource.CREATE_TIME:
             data = datetime.fromtimestamp(data).strftime("%Y-%m-%d %H:%M:%S")

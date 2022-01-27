@@ -134,6 +134,7 @@ NBSTAT_FORMATTER = ResourceFormatter([
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
     {'resource' : Resource.TYPE, 'include' : True},
     {'resource' : Resource.PID, 'include' : True},
+    {'resource' : Resource.PPID, 'include' : False},
     {'resource' : Resource.NGID, 'include' : False},
     {'resource' : Resource.PYTHON_PPID, 'include' : False},
     {'resource' : Resource.KERNEL, 'include' : False},
@@ -182,6 +183,7 @@ DEVICESTAT_FORMATTER = ResourceFormatter([
     # Process info
     {'resource' : Resource.TYPE, 'include' : False},
     {'resource' : Resource.PID, 'include' : False},
+    {'resource' : Resource.PPID, 'include' : False},
     {'resource' : Resource.NGID, 'include' : False},
     {'resource' : Resource.PYTHON_PPID, 'include' : False},
     {'resource' : Resource.KERNEL, 'include' : False},

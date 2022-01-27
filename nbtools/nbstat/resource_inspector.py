@@ -66,6 +66,7 @@ class ResourceInspector:
     merging them into views, and formatting into nice colored strings.
 
     TODO: correct working with VSCode Jupyter Notebooks
+    TODO: make sure that everything works without sudo
     TODO: can add explicit __delete__ to call nvidia_smi.nvmlShutdown(), if we ever have problems with that
     """
     def __init__(self, formatter):
@@ -73,6 +74,8 @@ class ResourceInspector:
         self._device_handles = None
 
         self.pid_to_process = {}
+
+        self.warnings = {}
 
     @property
     def device_handles(self):
@@ -240,6 +243,12 @@ class ResourceInspector:
                     # Command used to start the Python interpreter
                     cmdline = ' '.join(process.cmdline())
 
+                    # cwd with a default: access can be denied to current user
+                    try:
+                        cwd = process.cwd()
+                    except psutil.AccessDenied:
+                        cwd = ''
+
                     # Determine the type, name and path of the python process
                     kernel_id = KERNEL_ID_SEARCHER(cmdline)
                     vscode_key = VSCODE_KEY_SEARCHER(cmdline)
@@ -250,7 +259,7 @@ class ResourceInspector:
                         # If not, then something very fishy is going on.
                         type_ = 'notebook'
                         name = kernel_id.group(1).split('-')[0] + '.ipynb'
-                        path = os.path.join(process.cwd(), name)
+                        path = os.path.join(cwd, name)
                         kernel_id = kernel_id.group(1)
                     elif vscode_key:
                         # Can't tell much more for processes run by VSCode for now
@@ -260,12 +269,12 @@ class ResourceInspector:
                     elif script_name:
                         type_ = 'script'
                         name = script_name.group(1) + '.py'
-                        path = os.path.join(process.cwd(), name)
+                        path = os.path.join(cwd, name)
                         kernel_id = None
                     else:
                         type_ = 'unknown'
                         name = 'unknown'
-                        path = process.cwd()
+                        path = cwd
                         kernel_id = None
 
                     # PYTHON_PPID = PPID if parent is Python process else -1
@@ -285,6 +294,7 @@ class ResourceInspector:
                     # Fill in the basic info
                     process_info = {
                         Resource.PID : pid,
+                        Resource.PPID : ppid,
                         Resource.NGID : pid_to_ngid(pid),
                         Resource.PYTHON_PPID : python_ppid,
                         Resource.TYPE : type_,
@@ -346,6 +356,17 @@ class ResourceInspector:
                 return result
 
             table.add_column(Resource.HOST_PID, select_pid)
+
+            # Check if some of `device pids` are not referenced in the `table`
+            set_device_pids = set(device_pids)
+            set_host_pids = set(table[Resource.HOST_PID])
+            if None in set_device_pids:
+                set_device_pids.pop(None)
+            if None in set_host_pids:
+                set_host_pids.pop(None)
+            if set_device_pids != set_host_pids:
+                self.warnings['missing_device_pids'] = set_device_pids.difference(set_host_pids)
+
             table = ResourceTable.merge(table, device_process_table,
                                         self_key=Resource.HOST_PID, other_key=Resource.DEVICE_PROCESS_PID)
 
