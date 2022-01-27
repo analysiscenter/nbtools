@@ -137,6 +137,7 @@ NBSTAT_FORMATTER = ResourceFormatter([
     {'resource' : Resource.PPID, 'include' : False},
     {'resource' : Resource.NGID, 'include' : False},
     {'resource' : Resource.PYTHON_PPID, 'include' : False},
+    {'resource' : Resource.HOST_PID, 'include' : False},
     {'resource' : Resource.KERNEL, 'include' : False},
     {'resource' : Resource.STATUS, 'include' : False, 'min_width' : 10},
 
@@ -186,6 +187,7 @@ DEVICESTAT_FORMATTER = ResourceFormatter([
     {'resource' : Resource.PPID, 'include' : False},
     {'resource' : Resource.NGID, 'include' : False},
     {'resource' : Resource.PYTHON_PPID, 'include' : False},
+    {'resource' : Resource.HOST_PID, 'include' : False},
     {'resource' : Resource.KERNEL, 'include' : False},
     {'resource' : Resource.STATUS, 'include' : False},
     {'resource' : Resource.CREATE_TIME, 'include' : False},

@@ -47,9 +47,12 @@ class ResourceEntry(dict):
         data = self.get(resource, None)
 
         # Process description
-        if resource in [Resource.NAME, Resource.PATH, Resource.TYPE, Resource.STATUS,
+        if resource in [Resource.PATH, Resource.STATUS,
                         Resource.PID, Resource.PPID, Resource.NGID, Resource.HOST_PID, Resource.PYTHON_PPID]:
             pass
+        elif resource in [Resource.NAME, Resource.TYPE]:
+            if data is not None and ('zombie' in data or 'container' in data):
+                style = terminal.red
         elif resource == Resource.CREATE_TIME:
             data = datetime.fromtimestamp(data).strftime("%Y-%m-%d %H:%M:%S")
         elif resource == Resource.KERNEL:
@@ -650,7 +653,7 @@ class ResourceTable:
             for line, string in zip(lines, strings):
                 line.append(string)
 
-        lines = [' '.join(line).rstrip() for line in lines]
+        lines = [' '.join(line).rstrip() + terminal.normal for line in lines]
 
         # Add separators between index values
         if separate_index or (add_header and separate_header):

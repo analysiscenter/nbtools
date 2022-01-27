@@ -356,16 +356,7 @@ class ResourceInspector:
                 return result
 
             table.add_column(Resource.HOST_PID, select_pid)
-
-            # Check if some of `device pids` are not referenced in the `table`
-            set_device_pids = set(device_pids)
-            set_host_pids = set(table[Resource.HOST_PID])
-            if None in set_device_pids:
-                set_device_pids.pop(None)
-            if None in set_host_pids:
-                set_host_pids.pop(None)
-            if set_device_pids != set_host_pids:
-                self.warnings['missing_device_pids'] = set_device_pids.difference(set_host_pids)
+            self.nbstat_check_device_pids(device_pids, table, add_to_table=True)
 
             table = ResourceTable.merge(table, device_process_table,
                                         self_key=Resource.HOST_PID, other_key=Resource.DEVICE_PROCESS_PID)
@@ -420,6 +411,8 @@ class ResourceInspector:
         if notebook_table:
             table.update(notebook_table, self_key=Resource.KERNEL, other_key=Resource.KERNEL, inplace=True)
 
+        self.devicestat_check_device_pids(table)
+
         # A simple sort of entries and index
         table.sort(key=Resource.CREATE_TIME, reverse=False)
         table.set_index(Resource.DEVICE_ID, inplace=True)
@@ -432,6 +425,53 @@ class ResourceInspector:
         device_table.set_index(Resource.DEVICE_ID)
         return device_table
 
+
+    # Check for information consistency in multiple tables
+    def nbstat_check_device_pids(self, device_pids, table, add_to_table=True):
+        """ Check if some of `device pids` are not referenced in the `table`.
+        Add them with template names and values, if needed.
+        """
+        set_device_pids = set(device_pids)
+        set_host_pids = set(table[Resource.HOST_PID])
+        if None in set_device_pids:
+            set_device_pids.pop(None)
+        if None in set_host_pids:
+            set_host_pids.pop(None)
+
+        if set_device_pids != set_host_pids:
+            missing_pids = set_device_pids.difference(set_host_pids)
+            self.warnings['missing_device_pids'] = missing_pids
+
+            if add_to_table:
+                entry_template = {key : None for key in table.columns}
+                for missing_pid in sorted(missing_pids):
+                    entry = {
+                        **entry_template,
+                        Resource.NAME : 'device_zombie',
+                        Resource.TYPE : 'device_zombie',
+                        Resource.PATH : 'device_zombie',
+                        Resource.STATUS : 'sleeping',
+                        Resource.PID : missing_pid,
+                        Resource.PPID : missing_pid,
+                        Resource.NGID : missing_pid,
+                        Resource.HOST_PID : missing_pid,
+                        Resource.PYTHON_PPID : missing_pid,
+                    }
+                    table.append(entry)
+
+    def devicestat_check_device_pids(self, table):
+        """ Check if some of the `device pids` are not matched to any Python processes.
+        Add template names to them insted of empty ones.
+        """
+        self.warnings['missing_device_pids'] = set()
+        for entry in table:
+            if entry[Resource.DEVICE_PROCESS_PID] is not None and entry[Resource.HOST_PID] is None:
+                self.warnings['missing_device_pids'].add(entry[Resource.DEVICE_PROCESS_PID])
+
+                entry.update({Resource.NAME : 'device_zombie',
+                              Resource.TYPE : 'device_zombie',
+                              Resource.PATH : 'device_zombie',
+                              Resource.STATUS : 'sleeping'})
 
     # Make formatted visualization of tables
     def get_view(self, name='nbstat', index_condition=None, force_styling=True, sort=True, verbose=0,
