@@ -2,7 +2,7 @@
 import os
 import sys
 
-from .core import StringWithDisabledRepr, notebook_to_script
+from .core import StringWithDisabledRepr, get_notebook_path, notebook_to_script
 
 
 
@@ -16,7 +16,7 @@ argument-rgx=(.*[a-z][a-z0-9_]{{1,30}}|[a-z_])$ # snake_case + single letters
 disable=too-few-public-methods, unsubscriptable-object, no-member, too-many-lines, too-many-locals,
         arguments-renamed, arguments-differ, multiple-statements, invalid-name,
         missing-module-docstring, missing-final-newline, redefined-outer-name,
-        wrong-import-position, no-name-in-module, import-error,
+        wrong-import-position, no-name-in-module, import-error, unused-wildcard-import,
         unnecessary-semicolon, trailing-whitespace, trailing-newlines,
         {disable}
 
@@ -53,17 +53,19 @@ def generate_pylintrc(path, disable=(), enable=(), max_line_length=120, **pylint
     return pylintrc
 
 
-def pylint_notebook(path, options=(), disable=(), enable=(), printer=print,
+def pylint_notebook(path=None, options=(), disable=(), enable=(), printer=print,
                     remove_files=True, return_info=False, **pylint_params):
     """ !!. """
     from pylint import epylint as lint #pylint: disable=import-outside-toplevel
-
+    path = path or get_notebook_path()
+    if path is None:
+        raise ValueError('Provide path to Jupyter Notebook or run `pylint_notebook` inside of it!')
 
     # Convert notebook to a script
     path_script = os.path.splitext(path)[0] + '.py'
     script_name = os.path.basename(path_script)
 
-    code, cell_line_numbers = notebook_to_script(path, path_script, return_info=True).values()
+    code, cell_line_numbers = notebook_to_script(path_notebook=path, path_script=path_script, return_info=True).values()
 
     # Create pylintrc file
     path_pylintrc = os.path.splitext(path)[0] + '.pylintrc'
@@ -91,8 +93,10 @@ def pylint_notebook(path, options=(), disable=(), enable=(), printer=print,
             code_line_number = int(line.split(':')[1])
             for cell_number, cell_ranges in cell_line_numbers.items():
                 if code_line_number in cell_ranges:
-                    cell_line_number = code_line_number - cell_ranges[0] - 1
+                    cell_line_number = code_line_number - cell_ranges[0]
                     break
+            else:
+                cell_number, cell_line_number = -1, code_line_number
 
             # Find error_code and error_name: for example, `C0123` and `invalid-name`
             position_left  = line.find('(') + 1
@@ -117,10 +121,19 @@ def pylint_notebook(path, options=(), disable=(), enable=(), printer=print,
         printer(output)
 
     if return_info:
+        enumerated_code = code.split('\n')
+        n_digits = len(str(len(enumerated_code)))
+        enumerated_code = [f'{i:0>{n_digits}}    ' + item
+                           for i, item in enumerate(enumerated_code, start=1)]
+        enumerated_code = '\n'.join(enumerated_code)
+
         return {
-            'code' : StringWithDisabledRepr(code),
-            'pylintrc' : StringWithDisabledRepr(pylintrc),
             'report' : StringWithDisabledRepr(output),
+
+            'code' : StringWithDisabledRepr(code),
+            'enumerated_code' : StringWithDisabledRepr(enumerated_code),
+
+            'pylintrc' : StringWithDisabledRepr(pylintrc),
             'pylint_errors' : StringWithDisabledRepr(errors),
             'pylint_report' : StringWithDisabledRepr(report),
         }
