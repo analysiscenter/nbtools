@@ -1,4 +1,5 @@
 """ !!. """
+#pylint: disable=import-outside-toplevel
 import os
 
 from .core import StringWithDisabledRepr, get_notebook_path, notebook_to_script
@@ -55,7 +56,7 @@ def generate_pylintrc(path, disable=(), enable=(), max_line_length=120, **pylint
 def pylint_notebook(path=None, options=(), disable=(), enable=(), printer=print,
                     remove_files=True, return_info=False, **pylint_params):
     """ !!. """
-    from pylint import epylint as lint #pylint: disable=import-outside-toplevel
+    from pylint import epylint as lint
     path = path or get_notebook_path()
     if path is None:
         raise ValueError('Provide path to Jupyter Notebook or run `pylint_notebook` inside of it!')

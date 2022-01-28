@@ -14,7 +14,7 @@ import nvidia_smi
 
 from .resource import Resource
 from .resource_table import ResourceTable
-from .utils import true_len, true_rjust, format_memory
+from .utils import format_memory
 
 
 KERNEL_ID_SEARCHER   = re.compile('kernel-(.*).json').search
@@ -523,7 +523,7 @@ class ResourceInspector:
 
         # Placeholder for empty table
         if not table:
-            placeholder = true_rjust(terminal.bold + 'No entries to display!' + terminal.normal, true_len(lines[-1]))
+            placeholder = terminal.rjust(terminal.bold + 'No entries to display!' + terminal.normal, terminal.length(lines[-1]))
             lines[-1] = placeholder
 
         # For debug purposes
@@ -547,17 +547,17 @@ class ResourceInspector:
         parts = [part + terminal.normal for part in parts]
         added_line = '    '.join(parts)
 
-        added_line_width = true_len(added_line)
-        table_width = true_len(lines[0])
+        added_line_width = terminal.length(added_line)
+        table_width = terminal.length(lines[0])
 
         if added_line_width <= table_width:
-            added_line = true_rjust(added_line, table_width)
+            added_line = terminal.rjust(added_line, table_width)
         else:
-            lines = [true_rjust(line, added_line_width) for line in lines]
+            lines = [terminal.rjust(line, added_line_width) for line in lines]
         lines.insert(position, added_line)
 
         if separator_position is not None:
-            lines.insert(separator_position, terminal.separator_symbol * true_len(added_line))
+            lines.insert(separator_position, terminal.separator_symbol * terminal.length(added_line))
         return lines
 
     def add_supheader(self, lines, terminal, underline=True, bold=True, separate=True):

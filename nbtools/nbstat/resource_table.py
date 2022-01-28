@@ -5,7 +5,7 @@ Can be formatted into beautiful colored string representation by using `format` 
 from datetime import datetime
 
 from .resource import Resource
-from .utils import format_memory, true_len, true_rjust
+from .utils import format_memory
 
 class ResourceEntry(dict):
     """ Dictionary to hold all properties (Resources) of an entry.
@@ -651,9 +651,9 @@ class ResourceTable:
             # Make every string the same width
             strings = [main_style + style + string + terminal.normal
                        for style, string in zip(styles, strings)]
-            max_len = max(true_len(string) for string in strings)
+            max_len = max(terminal.length(string) for string in strings)
             width = max(min_width, max_len)
-            strings = [true_rjust(string, width) for string in strings]
+            strings = [terminal.rjust(string, width) for string in strings]
 
             for line, string in zip(lines, strings):
                 line.append(string)
@@ -674,7 +674,7 @@ class ResourceTable:
             else:
                 separator_indices = separator_indices[1:][::-1]
 
-            separator = terminal.separator_symbol * true_len(lines[0])
+            separator = terminal.separator_symbol * terminal.length(lines[0])
             for idx in separator_indices:
                 lines.insert(idx, separator)
 

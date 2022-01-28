@@ -1,9 +1,8 @@
 """ !!. """
+#pylint: disable=import-outside-toplevel
 import os
 import re
 import json
-import time
-import hashlib
 
 
 
