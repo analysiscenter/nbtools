@@ -1,0 +1,21 @@
+name: status
+
+on: [push]
+
+jobs:
+
+  lint-test:
+
+    runs-on: ubuntu-latest
+
+    container:
+      image: analysiscenter1/ds-py3:latest
+
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: Update pylint
+      run: pip3 install -U pylint
+
+    - name: Check pylint
+      run: pylint -rn --rcfile pylintrc nbtools
