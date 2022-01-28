@@ -67,6 +67,7 @@ class ResourceInspector:
 
     TODO: correct working with VSCode Jupyter Notebooks
     TODO: make sure that everything works without sudo
+    TODO: add more fallbacks for unavailable resources
     TODO: can add explicit __delete__ to call nvidia_smi.nvmlShutdown(), if we ever have problems with that
     """
     def __init__(self, formatter):
@@ -322,7 +323,7 @@ class ResourceInspector:
 
 
     # Aggregate multiple ResourceTables into more representative tables
-    def get_nbstat_table(self, sort=True, verbose=0):
+    def make_nbstat_table(self, sort=True, verbose=0):
         """ Prepare a `nbstat` view: a table, indexed by script/notebook name, with info about each of its processes.
 
         Parameters
@@ -381,7 +382,10 @@ class ResourceInspector:
         # Sort index on create time
         table.set_index(Resource.PATH, inplace=True)
         if sort:
-            table.sort_by_index(key=Resource.CREATE_TIME, aggregation=min)
+            uses_device = lambda entry: entry[Resource.DEVICE_ID] is not None
+            table.add_column('uses_device', uses_device)
+            table.sort_by_index(key=('uses_device', Resource.CREATE_TIME),
+                                reverse=[True, False], aggregation=[max, min])
 
         # Filter non-device notebooks
         if verbose <= 1:
@@ -389,7 +393,7 @@ class ResourceInspector:
             table.filter_by_index(function, inplace=True)
         return table
 
-    def get_devicestat_table(self):
+    def make_devicestat_table(self):
         """ A transposed `nbstat` view: the same information, but indexed with device ids. """
         device_table, device_process_table = self.get_device_table()
         notebook_table = self.get_notebook_table()
@@ -419,7 +423,7 @@ class ResourceInspector:
         table.sort_by_index(key=Resource.DEVICE_ID, aggregation=min)
         return table
 
-    def get_gpustat_table(self):
+    def make_gpustat_table(self):
         """ A device-only view. Same information, as vanilla `gpustat`. """
         device_table, _ = self.get_device_table()
         device_table.set_index(Resource.DEVICE_ID)
@@ -456,6 +460,7 @@ class ResourceInspector:
                         Resource.NGID : missing_pid,
                         Resource.HOST_PID : missing_pid,
                         Resource.PYTHON_PPID : missing_pid,
+                        Resource.CREATE_TIME : missing_pid, # for sort on `CREATE_TIME`
                     }
                     table.append(entry)
 
@@ -485,11 +490,11 @@ class ResourceInspector:
         """
         # Get the table
         if name.startswith('nb'):
-            table = self.get_nbstat_table(sort=sort, verbose=verbose)
+            table = self.make_nbstat_table(sort=sort, verbose=verbose)
         elif name.startswith('device'):
-            table = self.get_devicestat_table()
+            table = self.make_devicestat_table()
         elif name.startswith('gpu'):
-            table = self.get_gpustat_table()
+            table = self.make_gpustat_table()
         else:
             raise ValueError('Wrong name of view to get!')
 
@@ -520,6 +525,9 @@ class ResourceInspector:
         if not table:
             placeholder = true_rjust(terminal.bold + 'No entries to display!' + terminal.normal, true_len(lines[-1]))
             lines[-1] = placeholder
+
+        # For debug purposes
+        self._table = table
         return '\n'.join(lines)
 
 

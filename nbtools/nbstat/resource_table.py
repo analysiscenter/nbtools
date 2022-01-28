@@ -50,9 +50,14 @@ class ResourceEntry(dict):
         if resource in [Resource.PATH, Resource.STATUS,
                         Resource.PID, Resource.PPID, Resource.NGID, Resource.HOST_PID, Resource.PYTHON_PPID]:
             pass
+
         elif resource in [Resource.NAME, Resource.TYPE]:
-            if data is not None and ('zombie' in data or 'container' in data):
-                style = terminal.red
+            if data is not None:
+                if 'zombie' in data or 'container' in data:
+                    style = terminal.red
+                if '/' in data:
+                    data = '~' + data.split('/')[-1]
+
         elif resource == Resource.CREATE_TIME:
             data = datetime.fromtimestamp(data).strftime("%Y-%m-%d %H:%M:%S")
         elif resource == Resource.KERNEL:
@@ -412,7 +417,7 @@ class ResourceTable:
         self.index_values = index_values
         return self
 
-    def _get_subtable(self, index_value):
+    def _extract_subtable(self, index_value):
         """ Extract subtable, corresponding to one of the current index values. """
         subtable = ResourceTable()
         for entry in self:
@@ -424,7 +429,7 @@ class ResourceTable:
         """ Split the table into a list of subtables, corresponding to unique index values. """
         subtables = []
         for index_value in self.index_values:
-            subtable = self._get_subtable(index_value)
+            subtable = self._extract_subtable(index_value)
             subtables.append(subtable)
 
         return subtables
@@ -442,7 +447,7 @@ class ResourceTable:
         aggregation = aggregation if isinstance(aggregation, (tuple, list)) else [aggregation] * len(key)
 
         def itemgetter(index_value):
-            subtable = self._get_subtable(index_value)
+            subtable = self._extract_subtable(index_value)
             result = []
 
             for key_, default_, reverse_, aggregation_ in zip(key, default, reverse, aggregation):
