@@ -1,6 +1,5 @@
 """ !!. """
 import os
-import sys
 
 from .core import StringWithDisabledRepr, get_notebook_path, notebook_to_script
 
@@ -47,7 +46,7 @@ def generate_pylintrc(path, disable=(), enable=(), max_line_length=120, **pylint
             value = ', '.join(value)
         pylintrc += f'\n{key}={value}'
 
-    with open(path, 'w') as file:
+    with open(path, 'w', encoding='utf-8') as file:
         file.write(pylintrc)
 
     return pylintrc
@@ -137,4 +136,4 @@ def pylint_notebook(path=None, options=(), disable=(), enable=(), printer=print,
             'pylint_errors' : StringWithDisabledRepr(errors),
             'pylint_report' : StringWithDisabledRepr(report),
         }
-    return
+    return None

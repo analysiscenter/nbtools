@@ -10,6 +10,7 @@ import hashlib
 class StringWithDisabledRepr(str):
     """ String with disabled repr. Used to avoid cluttering repr from function outputs. """
     def __repr__(self):
+        """ !!. """
         return f'<StringWithDisabledRepr at {hex(id(self))}. Use `str`/`print` explicitly!>'
 
 
@@ -105,11 +106,10 @@ def notebook_to_script(path_script, path_notebook=None, ignore_markdown=True, re
 
     code = '\n'.join(code_lines).strip()
 
-    with open(path_script, 'w') as file:
+    with open(path_script, 'w', encoding='utf-8') as file:
         file.write(code)
 
     if return_info:
         return {'code': StringWithDisabledRepr(code),
                 'cell_line_numbers': cell_line_numbers}
-    return
-
+    return None

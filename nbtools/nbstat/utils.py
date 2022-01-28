@@ -6,7 +6,7 @@ from blessed import Terminal
 
 
 COLORS = Terminal(kind=os.getenv('TERM'), force_styling=True)
-COLORS._normal = u'\x1b[0;10m'
+COLORS._normal = '\x1b[0;10m'
 
 
 COLOR_REPLACER = re.compile(r"\x1b\[[;\d]*[A-Za-z]").sub

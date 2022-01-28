@@ -535,7 +535,7 @@ class ResourceInspector:
         """ Create terminal instance. """
         terminal = Terminal(kind=os.getenv('TERM'), force_styling=force_styling if force_styling else None)
         terminal.separator_symbol = terminal.bold + separator + terminal.normal
-        terminal._normal = u'\x1b[0;10m' # pylint: disable=protected-access
+        terminal._normal = '\x1b[0;10m' # pylint: disable=protected-access
         return terminal
 
     def add_line(self, lines, parts, terminal, position, separator_position, underline, bold):
