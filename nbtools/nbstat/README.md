@@ -9,7 +9,7 @@ For more in-depth look at the inner workings, device choices and motivation behi
 
 ## Views
 
-The **nbstat** table information is, roughy, *for each Jupyter Notebook show all of its processes with system/device utilization information.*
+The **nbstat** table information is, roughy: *for each Jupyter Notebook show all of its processes with system/device utilization information.*
 
  Along with the **nbstat**, we provide following commands:
 
@@ -24,10 +24,10 @@ The first column of each table (Notebook name for **nbstat** or device ID for **
 
 Options are separated into four sections:
 
-* main options to filter the table and control how many processes are shown.
-* column options to control displayed information for each process.
-* table options to configure the formatting.
-* other options.
+* Main options to filter the table and control how many processes are shown.
+* Column options to control displayed information for each process.
+* Table options to configure the formatting.
+* Other options.
 
 ### Main options
 * `positional argument` — allows to filter the index (the first column) based on regular expression.
@@ -42,8 +42,9 @@ Options are separated into four sections:
 
 ### Column options
 * `--show a b c`, `--hide x y z ` — show or hide columns in the table.
+    * Column are added in pre-defined places.
     * `hide` has priority over `show`.
-    * Adding too much columns will screw up table formatting: especially true for very wide (`path`, `kernel_id`) columns.
+    * Adding too much columns will screw up the table formatting: especially true for very wide (`path`, `kernel_id`) columns.
     * Possible values depend on the exact table view (**nbstat** or **devicestat**): the actual list is available on the `--help` page.
     * In most cases, following names are recognized:
         * process properties — `process_name`, `type`, `path`, `pid`, `ppid`, `ngid`, `kernel_id`.
@@ -58,10 +59,12 @@ Options are separated into four sections:
 * `--show-footnote`, `--hide-footnote` — show a row with total system resource usage.
     * By default, it is enabled if the table is refreshed continuously (`--watch`) and disabled otherwise.
 * `--add-separators`, `--hide-separators` — turn on/off all the table separators (lines between rows/columns).
+    * By default, separators are enabled for **nbstat** and disabled for **devicestat**.
 * `--supress-color` — disable using colors in the displayed view.
 
 ### Other options
 * `-i`, `-n`, `--interval`, `--watch` — continuously update information from the table in a fullscreen terminal.
+    * If provided, a number sets the interval between ticks: `nbstat -i 0.2`.
 
 
 ## Sort
@@ -75,11 +78,11 @@ The **nbstat** table is sorted in the following way:
     * processes that do not use NVIDIA devices, sorted by starting time. Note that those processes are shown only with verbosity level >=1.
 
 ## Usage examples
-Using plain **nbwatch** is enough to monitor your usual ML applications. In some situations, following snippets can be helpful:
+Using plain **nbwatch** is enough to monitor your usual ML applications. In some situations, though, following snippets are helpful:
 
 * `nbstat .*.ipynb` — to show only Jupyter Notebooks.
 * `nbstat -v`, `nbstat -V` is immensely helpful for `multiprocessing`-related debugging.
     * Adding `--show pid ppid` can be nice to navigate through large number of processes.
 
 ## Using as a Python library
-Sometimes, it is desired to get **nbstat** / **devicestat** information as a Python object to parse it manually. You can learn how to do it in the [tutorial]().
+Sometimes, it is desired to get **nbstat** / **devicestat** information as a Python object to parse it manually. You can learn how to do it in the [tutorial](!!.).

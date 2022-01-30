@@ -10,7 +10,7 @@ pip install nbtools
 
 The main tool of this package is **nbstat** / **nbwatch** command line utility. It is added at installation and shows the detailed resource utilization for each process of each running Jupyter Notebook.
 
-[Full user documentation: explanation of different table views, command line options and ready-to-use snippets.](nbtools/nbstat/README.md)
+Full [user documentation:](nbtools/nbstat/README.md) explanation of different table views, command line options and ready-to-use snippets.
 
 <img src="images/nbstat.gif" width="100%"/>
 
@@ -22,7 +22,7 @@ We also add the **devicestat** and **devicewatch** commands that show transposed
 devicestat gif
 </details>
 
-If you are interested to contribute, check out [the developer/contributor page.](nbtools/nbstat/DEV.md) It contains detailed description about inner workings of the library, my design choices and motivation behind them, as well as discussion of complexities along the way.
+If you are interested to contribute, check out the [developer/contributor page.](nbtools/nbstat/DEV.md) It contains detailed description about inner workings of the library, my design choices and motivation behind them, as well as discussion of complexities along the way.
 
 
 ## **pylint_notebook**

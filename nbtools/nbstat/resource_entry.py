@@ -170,4 +170,3 @@ class ResourceEntry(dict):
             else:
                 string = default_string
         return style, string
-
