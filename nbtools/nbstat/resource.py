@@ -49,7 +49,7 @@ class Resource(Enum):
     HOST_PID = auto()
     PYTHON_PPID = auto()
     CREATE_TIME = auto()
-    KERNEL = auto()
+    KERNEL = 'kernel_id'
     STATUS = auto()
 
     RSS = auto()

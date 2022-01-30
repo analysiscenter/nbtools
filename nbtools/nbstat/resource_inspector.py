@@ -382,7 +382,7 @@ class ResourceInspector:
         # Sort index on create time
         table.set_index(Resource.PATH, inplace=True)
         if sort:
-            uses_device = lambda entry: entry[Resource.DEVICE_ID] is not None
+            uses_device = lambda entry: entry.get(Resource.DEVICE_ID) is not None
             table.add_column('uses_device', uses_device)
             table.sort_by_index(key=('uses_device', Resource.CREATE_TIME),
                                 reverse=[True, False], aggregation=[max, min])
@@ -523,8 +523,9 @@ class ResourceInspector:
 
         # Placeholder for empty table
         if not table:
-            placeholder = terminal.rjust(terminal.bold + 'No entries to display!' + terminal.normal, terminal.length(lines[-1]))
-            lines[-1] = placeholder
+            width = terminal.length(lines[-1])
+            placeholder = terminal.rjust(terminal.bold + 'No entries to display!' + terminal.normal, width)
+            lines.insert(2, placeholder)
 
         # For debug purposes
         self._table = table

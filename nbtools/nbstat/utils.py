@@ -1,8 +1,5 @@
 """ Utility functions. """
-#pylint: disable=redefined-builtin, protected-access
-import os
-import re
-from blessed import Terminal
+#pylint: disable=redefined-builtin
 
 
 def format_memory(number, format=3):
