@@ -294,13 +294,14 @@ class ResourceInspector:
 
                     # Fill in the basic info
                     process_info = {
+                        Resource.NAME : name,
+                        Resource.PATH : path,
+                        Resource.CMDLINE : cmdline,
+                        Resource.TYPE : type_,
                         Resource.PID : pid,
                         Resource.PPID : ppid,
                         Resource.NGID : pid_to_ngid(pid),
                         Resource.PYTHON_PPID : python_ppid,
-                        Resource.TYPE : type_,
-                        Resource.NAME : name,
-                        Resource.PATH : path,
                         Resource.CREATE_TIME : process.create_time(),
                         Resource.KERNEL : kernel_id,
                         Resource.STATUS : process.status(),
@@ -383,8 +384,8 @@ class ResourceInspector:
         table.set_index(Resource.PATH, inplace=True)
         if sort:
             uses_device = lambda entry: entry.get(Resource.DEVICE_ID) is not None
-            table.add_column('uses_device', uses_device)
-            table.sort_by_index(key=('uses_device', Resource.CREATE_TIME),
+            table.add_column(Resource.USES_DEVICE, uses_device)
+            table.sort_by_index(key=(Resource.USES_DEVICE, Resource.CREATE_TIME),
                                 reverse=[True, False], aggregation=[max, min])
 
         # Filter non-device notebooks

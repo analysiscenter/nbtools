@@ -43,6 +43,7 @@ class Resource(Enum):
     TYPE = auto()
     NAME = 'process_name'
     PATH = auto()
+    CMDLINE = auto()
     PID = auto()
     PPID = auto()
     NGID = auto()
@@ -78,6 +79,7 @@ class Resource(Enum):
     TABLE_DELIMITER1 = auto()
     TABLE_DELIMITER2 = auto()
     DEVICE_SHORT_ID = 'short_id'
+    USES_DEVICE = auto()
 
     def __repr__(self):
         return self.name

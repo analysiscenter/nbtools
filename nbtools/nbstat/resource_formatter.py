@@ -129,6 +129,7 @@ NBSTAT_FORMATTER = ResourceFormatter([
     # Notebook/script name
     {'resource' : Resource.NAME, 'include' : True, 'hidable': True},
     {'resource' : Resource.PATH, 'include' : False, 'hidable': True},
+    {'resource' : Resource.CMDLINE, 'include' : False, 'hidable': True},
 
     # Process info
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
@@ -179,6 +180,7 @@ DEVICESTAT_FORMATTER = ResourceFormatter([
 
     # Notebook/script name
     {'resource' : Resource.NAME, 'include' : True},
+    {'resource' : Resource.CMDLINE, 'include' : False, 'hidable': True},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
 
     # Process info
