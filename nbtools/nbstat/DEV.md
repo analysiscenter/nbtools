@@ -9,9 +9,9 @@ Before writing any code, I had following goals and requirements in mind:
 * Ease of adding new columns and ways to extract information from the system and devices.
 * Ease of creating new views for the same data: rearranging columns, adding table elements (column separators, for example), etc.
 * Cross-platform usage: rely on **psutil** to work with processes on both Linux and Windows.
-    * The **psutil** is quite slow, and on Linux-based OS we can speed up things by an order of magnitude. The code should be reasonbly easy to modify to use custom functions for interacting with system resources.
+    * The **psutil** is quite slow, and on Linux-based OS we can speed up things by an order of magnitude. The code should be reasonably easy to modify to use custom functions for interacting with system resources.
 * Avoid external dependencies as much as possible: the code should be self-contained and clean.
-    * This led to writing custom `ResourceTable` class, with API inspired by the `pandas.DataFrame`. As tables in this module contain information about devices, Jupyter Notebooks and Python processes, the effeciency of storing and aggregating tables is not really a priority: all of the tables are small. Nevertheless, on tables with 1000 or less rows the code is actually faster.
+    * This led to writing custom `ResourceTable` class, with API inspired by the `pandas.DataFrame`. As tables in this module contain information about devices, Jupyter Notebooks and Python processes, the efficiency of storing and aggregating tables is not really a priority: all of the tables are small. Nevertheless, on tables with 1000 or less rows the code is actually faster.
 
 Below I explain how these goals are achieved and which code is responsible for what. At the end of this page, you can see a list of possible further improvements.
 
@@ -51,7 +51,7 @@ Going from the very bottom to the top, I use following class structure:
     * Note that we can't create formatted string knowing just the pair of `resource : value`, as some of the columns require knowing multiple values at once. For example, to create **device memory** column we combine the **current used** and **total memory available** columns.
 
 * `ResourceTable` — container for multiple `ResourceEntry` instances. Describes the same set of properties for a number of processes.
-    * Essentially, a budget version of `pd.DataFrame`. Provides a `to_pd` method for conveniency, which can be used only if **pandas** is already installed.
+    * Essentially, a budget version of `pd.DataFrame`. Provides a `to_pd` method for convenience, which can be used only if **pandas** is already installed.
     * Under the hood, is a list of `ResourceEntries`, which are in turn dictionaries.
     * Has the concept of *index*, which allows to split the table into subtables on unique values of *indexing* column.
     * Can be sorted and filtered, based on column or unique values in index.
@@ -80,14 +80,14 @@ Going from the very bottom to the top, I use following class structure:
     * Using `include=True/False` instead of adding/removing elements from the list allows to show additional columns in the table in the desired places.
     * For example, using `--show pid` sets the `include` flag of this resource to `True` and automatically places this column next to `status`.
     * Moreover, at the data collection step, we request only those resources, which have the `include=True` flag.
-    * For conveniency, `__getitem__` is overloaded to recognize `Resources` and their aliases as keys. It returns True if this resource has `include=True` flag.
+    * For convenience, `__getitem__` is overloaded to recognize `Resources` and their aliases as keys. It returns True if this resource has `include=True` flag.
     * Knowing the entire formatter in advance allows us to list all of the available columns in the `--help`: they are guaranteed to work and require no manual modifications to documentation.
     * The reason for it to be a `list` instead of `dict` is to allow duplicates.
 
 
 Other that those primitives, it is worth to mention:
 * [`blessed.Terminal`](https://github.com/jquast/blessed) is used for interacting with terminal, adding colors and other control sequences to the formatted strings
-    * `length` and `rjust` methods are absolutely amazing and are actuall blessing.
+    * `length` and `rjust` methods are absolutely amazing and are actual blessing.
 * `cli.py` contains parsing of command line arguments.
 
 Along the code, I've left a lot of dev comments and docstrings. The recommended order of reading it should be:
@@ -96,6 +96,14 @@ Along the code, I've left a lot of dev comments and docstrings. The recommended 
 * resource_formatter.py
 * resource_table.py
 * resource_entry.py
+
+## Adding new Resources
+
+To add new tracked property, one should:
+* add it to `Resource` enumeration.
+* add a way to collect it in either of `ResourceInspector.get_*_table` methods.
+* add a way to visually represent it in `Resource` and `ResourceEntry`.
+* add it in some of the formatters.
 
 ## Known problems
 * **PID namespaces.** In order to create the final table, we need to merge tables with device and process information on PIDs. It is a [known problem](https://github.com/NVIDIA/nvidia-docker/issues/179) that **nvidia-smi** reports PIDs of processes on devices in the global namespace, not in the container namespace, which does not allow to match PIDs of container processes to their device PIDs. There are a few workarounds:
@@ -113,7 +121,7 @@ Along the code, I've left a lot of dev comments and docstrings. The recommended 
 * **Sort API exposition to command line.** `ResourceTable` class allows for complex sorts on its columns / index values. Despite that, exposing sort functionality to command line is non-trivial:
     * Different command line arguments for sorting index and regular columns.
     * A lot of parameters even for a simple sort: resource, ascending/descending, placeholder value if missing.
-    * Sorting on column will most definetely break existing sort.
+    * Sorting on column will most definitely break existing sort.
     * Most of the resource-related sorts are actually unusable. For example, sorting `nbwatch` output on **CPU** usage would make the entire table swap rows on ~each tick, making it both unreadable and unwatchable.
 
     Currently, I think the best way to go forward is to wait for actual use cases and their motivation. In case we find a new desired ordering of the view, adding pre-defined and well-behaved sorts seems to be the best option.

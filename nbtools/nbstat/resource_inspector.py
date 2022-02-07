@@ -61,6 +61,26 @@ def pid_to_ngid_linux(pid):
 pid_to_ngid = pid_to_ngid_linux if SYSTEM == 'Linux' else pid_to_ngid_generic
 
 
+class FiniteList(list):
+    """ List with finite number of elements: if the size is more """
+    def __init__(self, *args, size=10, **kwargs):
+        self.size = size
+        super().__init__(*args, **kwargs)
+
+    def append(self, obj):
+        if len(self) >= self.size:
+            self.pop(0)
+        super().append(obj)
+
+    def get_average(self, size=None):
+        size = size or self.size
+        if len(self) > size // 2:
+            sublist = self[-size:]
+            return round(sum(sublist) / len(sublist))
+        return None
+
+
+
 class ResourceInspector:
     """ A class to controll the process of gathering information about system resources into ResourceTables,
     merging them into views, and formatting into nice colored strings.
@@ -70,12 +90,11 @@ class ResourceInspector:
     TODO: add more fallbacks for unavailable resources
     TODO: can add explicit __delete__ to call nvidia_smi.nvmlShutdown(), if we ever have problems with that
     """
-    def __init__(self, formatter):
+    def __init__(self, formatter=None):
         self.formatter = formatter
+
         self._device_handles = None
-
-        self.pid_to_process = {}
-
+        self._device_utils = None
         self.warnings = {}
 
     @property
@@ -89,9 +108,17 @@ class ResourceInspector:
                                     for device_id in range(n_devices)}
         return self._device_handles
 
+    @property
+    def device_utils(self):
+        """ Values of device utilization over time. """
+        if self._device_utils is None:
+            self._device_utils = {device_id : FiniteList(size=1000)
+                                  for device_id in self.device_handles}
+        return self._device_utils
+
 
     # Collect system resources into ResourceTables
-    def get_device_table(self):
+    def get_device_table(self, formatter=None, window=20):
         """ Collect data about current device usage into two tables:
         one is indexed by device, the second is indexed by process on a device.
 
@@ -105,6 +132,7 @@ class ResourceInspector:
         exist in the container namespace. Currently, we don't have a reliable and not overly hacky way of matching it to
         a PID inside the container: we circumwent this problem in the `process_table`.
         """
+        formatter = formatter or self.formatter
         device_table, device_process_table = ResourceTable(), ResourceTable()
 
         for device_id, handle in self.device_handles.items():
@@ -112,28 +140,36 @@ class ResourceInspector:
                            Resource.DEVICE_NAME : nvidia_smi.nvmlDeviceGetName(handle).decode()}
 
             # Inseparable device information like memory, temperature, power, etc. Request it only if needed
-            if self.formatter.get(Resource.DEVICE_UTIL, False):
+            if (formatter.get(Resource.DEVICE_UTIL, False) or
+                formatter.get(Resource.DEVICE_UTIL_BAR, False) or
+                formatter.get(Resource.DEVICE_UTIL_MA, False) or
+                formatter.get(Resource.DEVICE_UTIL_MA_BAR, False)):
                 utilization = nvidia_smi.nvmlDeviceGetUtilizationRates(handle)
                 common_info[Resource.DEVICE_UTIL] = utilization.gpu
                 common_info[Resource.DEVICE_MEMORY_UTIL] = utilization.memory
 
-            if self.formatter.get(Resource.DEVICE_TEMP, False):
+                # Store values over requests to compute moving average of device utilization
+                lst = self.device_utils[device_id]
+                lst.append(utilization.gpu)
+                common_info[Resource.DEVICE_UTIL_MA] = lst.get_average(size=window)
+
+            if formatter.get(Resource.DEVICE_TEMP, False):
                 temperature = nvidia_smi.nvmlDeviceGetTemperature(handle, nvidia_smi.NVML_TEMPERATURE_GPU)
                 common_info[Resource.DEVICE_TEMP] = temperature
 
-            if self.formatter.get(Resource.DEVICE_FAN, False):
+            if formatter.get(Resource.DEVICE_FAN, False):
                 fan_speed = nvidia_smi.nvmlDeviceGetFanSpeed(handle)
                 common_info[Resource.DEVICE_FAN] = fan_speed
 
-            if self.formatter.get(Resource.DEVICE_POWER_USED, False):
+            if formatter.get(Resource.DEVICE_POWER_USED, False):
                 power_used = nvidia_smi.nvmlDeviceGetPowerUsage(handle)
                 power_total = nvidia_smi.nvmlDeviceGetEnforcedPowerLimit(handle)
 
                 common_info[Resource.DEVICE_POWER_USED] = power_used
                 common_info[Resource.DEVICE_POWER_TOTAL] = power_total
 
-            if (self.formatter.get(Resource.DEVICE_MEMORY_USED, False) or
-                self.formatter.get(Resource.DEVICE_PROCESS_MEMORY_USED, False)):
+            if (formatter.get(Resource.DEVICE_MEMORY_USED, False) or
+                formatter.get(Resource.DEVICE_PROCESS_MEMORY_USED, False)):
                 memory = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
                 common_info[Resource.DEVICE_MEMORY_USED] = memory.used
                 common_info[Resource.DEVICE_MEMORY_TOTAL] = memory.total
@@ -163,7 +199,7 @@ class ResourceInspector:
             device_table.append(device_info)
         return device_table, device_process_table
 
-    def get_notebook_table(self):
+    def get_notebook_table(self, formatter=None):
         """ Collect information about all running Jupyter Notebooks inside all of the Jupyter Servers.
         Works with both v2 and v3 APIs.
 
@@ -184,6 +220,8 @@ class ResourceInspector:
             servers.extend(list(list_running_servers_v3()))
         except ImportError:
             pass
+
+        _ = formatter # currently, not used
 
         # Information about all running kernels for all running servers
         notebook_table = ResourceTable()
@@ -211,7 +249,7 @@ class ResourceInspector:
                 python_pids.add(pid)
         return python_pids
 
-    def get_process_table(self):
+    def get_process_table(self, formatter=None):
         """ Collect information about all Python processes.
         Information varies from properties of a process (its path, PID, NGID, status, etc) to system resource usage like
         CPU utilization or RSS. The table also includes some inferred columns like type and kernel_id.
@@ -230,14 +268,14 @@ class ResourceInspector:
         either PIDs or NGIDs (whichever matches the DEVICE_PIDs) to merge with device information.
         This fallback should be easy to extend once we find new ways of inferring the host PID of a process.
         """
+        formatter = formatter or self.formatter
+
         python_pids = self.get_python_pids()
 
         process_table = ResourceTable()
         for pid in python_pids:
             try:
-                if pid not in self.pid_to_process:
-                    self.pid_to_process[pid] = psutil.Process(pid)
-                process = self.pid_to_process[pid]
+                process = psutil.Process(pid)
                 pid = process.pid
 
                 with process.oneshot():
@@ -309,10 +347,10 @@ class ResourceInspector:
                     }
 
                     # Gather resource info
-                    if self.formatter.get(Resource.CPU, False):
+                    if formatter.get(Resource.CPU, False):
                         process_info[Resource.CPU] = process.cpu_percent()
 
-                    if self.formatter.get(Resource.RSS, False):
+                    if formatter.get(Resource.RSS, False):
                         memory = process.memory_info()
                         process_info[Resource.RSS] = memory.rss
 
@@ -324,7 +362,7 @@ class ResourceInspector:
 
 
     # Aggregate multiple ResourceTables into more representative tables
-    def make_nbstat_table(self, sort=True, verbose=0):
+    def make_nbstat_table(self, formatter=None, sort=True, verbose=0, window=20):
         """ Prepare a `nbstat` view: a table, indexed by script/notebook name, with info about each of its processes.
 
         Parameters
@@ -342,9 +380,9 @@ class ResourceInspector:
             If 2, then we keep all notebooks and all processes for them.
         """
         # Collect all the data
-        _, device_process_table = self.get_device_table()       # ~20% of the method time taken
-        notebook_table = self.get_notebook_table()              # ~15% of the method time taken
-        process_table = self.get_process_table()                # ~45% of the method time taken
+        _, device_process_table = self.get_device_table(formatter=formatter, window=window) # ~20% of the time taken
+        notebook_table = self.get_notebook_table(formatter=formatter)                       # ~15% of the time taken
+        process_table = self.get_process_table(formatter=formatter)                         # ~45% of the time taken
 
         # Try to match the process pids (local namespace) to device pids (host). Merge on those
         table = process_table
@@ -370,9 +408,9 @@ class ResourceInspector:
         # Custom sort for processes: parent -> device processes -> non-device processes -> create time
         if sort:
             is_parent = lambda entry: entry[Resource.PYTHON_PPID] == -1
-            table.add_column('is_parent', is_parent)
+            table.add_column(Resource.IS_PARENT, is_parent)
 
-            table.sort(key=['is_parent', Resource.DEVICE_ID, Resource.CREATE_TIME],
+            table.sort(key=[Resource.IS_PARENT, Resource.DEVICE_ID, Resource.CREATE_TIME],
                        reverse=[True, False, False], default=[0.0, 999, 0.0])
 
         # Filter non-device processes
@@ -394,11 +432,11 @@ class ResourceInspector:
             table.filter_by_index(function, inplace=True)
         return table
 
-    def make_devicestat_table(self):
+    def make_devicestat_table(self, formatter=None, window=20):
         """ A transposed `nbstat` view: the same information, but indexed with device ids. """
-        device_table, device_process_table = self.get_device_table()
-        notebook_table = self.get_notebook_table()
-        process_table = self.get_process_table()
+        device_table, device_process_table = self.get_device_table(formatter=formatter, window=window)
+        notebook_table = self.get_notebook_table(formatter=formatter)
+        process_table = self.get_process_table(formatter=formatter)
 
         # Try to match the process pids (local namespace) to device pids (host). Merge on those
         device_pids = device_process_table[Resource.DEVICE_PROCESS_PID]
@@ -410,7 +448,8 @@ class ResourceInspector:
         process_table.add_column(Resource.HOST_PID, select_pid)
 
         table = device_table.unroll(inplace=False)
-        table = table.merge(process_table, self_key=Resource.DEVICE_PROCESS_PID, other_key=Resource.HOST_PID)
+        if process_table:
+            table = table.merge(process_table, self_key=Resource.DEVICE_PROCESS_PID, other_key=Resource.HOST_PID)
 
         # Update entries: change `path` and `name` for Notebook from placeholders to proper ones
         if notebook_table:
@@ -424,9 +463,9 @@ class ResourceInspector:
         table.sort_by_index(key=Resource.DEVICE_ID, aggregation=min)
         return table
 
-    def make_gpustat_table(self):
+    def make_gpustat_table(self, formatter=None, window=20):
         """ A device-only view. Same information, as vanilla `gpustat`. """
-        device_table, _ = self.get_device_table()
+        device_table, _ = self.get_device_table(formatter=formatter, window=window)
         device_table.set_index(Resource.DEVICE_ID)
         return device_table
 
@@ -480,7 +519,8 @@ class ResourceInspector:
                               Resource.STATUS : 'sleeping'})
 
     # Make formatted visualization of tables
-    def get_view(self, name='nbstat', index_condition=None, force_styling=True, sort=True, verbose=0,
+    def get_view(self, name='nbstat', formatter=None, index_condition=None, force_styling=True,
+                 sort=True, verbose=0, window=20,
                  add_supheader=True, underline_supheader=True, bold_supheader=True, separate_supheader=False,
                  add_header=True, underline_header=True, bold_header=False, separate_header=True,
                  add_footnote=False, underline_footnote=False, bold_footnote=False, separate_footnote=True,
@@ -489,13 +529,15 @@ class ResourceInspector:
         """ Get the desired view. Format it into colored string.
         Optionally, add a supheader (driver and CUDA info) and a footnote (total CPU / RSS usage) to the visualization.
         """
+        formatter = formatter or self.formatter
+
         # Get the table
         if name.startswith('nb'):
-            table = self.make_nbstat_table(sort=sort, verbose=verbose)
+            table = self.make_nbstat_table(formatter=formatter, sort=sort, verbose=verbose, window=window)
         elif name.startswith('device'):
-            table = self.make_devicestat_table()
+            table = self.make_devicestat_table(formatter=formatter, window=window)
         elif name.startswith('gpu'):
-            table = self.make_gpustat_table()
+            table = self.make_gpustat_table(formatter=formatter, window=window)
         else:
             raise ValueError('Wrong name of view to get!')
 
@@ -508,7 +550,7 @@ class ResourceInspector:
         terminal = self.make_terminal(force_styling=force_styling, separator=separator)
 
         # Make formatted strings
-        lines = table.format(terminal=terminal, formatter=self.formatter,
+        lines = table.format(terminal=terminal, formatter=formatter,
                              add_header=add_header, underline_header=underline_header,
                              bold_header=bold_header, separate_header=separate_header,
                              separate_index=separate_index, hide_similar=hide_similar,

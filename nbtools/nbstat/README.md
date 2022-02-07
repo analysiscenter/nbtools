@@ -9,15 +9,15 @@ For more in-depth look at the inner workings, device choices and motivation behi
 
 ## Views
 
-The **nbstat** table information is, roughy: *for each Jupyter Notebook show all of its processes with system/device utilization information.*
+The **nbstat** table information is, roughly: *for each Jupyter Notebook show all of its processes with system/device utilization information.*
 
  Along with the **nbstat**, we provide following commands:
 
 * **devicestat** — a transposed view of the same data: *for each NVIDIA device show all Jupyter Notebooks using it, along with other resources utilization.*
-* **nbwatch** — continuously update information from the **nbstat** table in a fullscreen terminal. Equivalent to `nbstat --watch`.
-* **devicewatch** — continuously update information from the **devicestat** table in a fullscreen terminal. Equivalent to `devicestat --watch`.
+* **nbwatch** — continuously update information from the **nbstat** table in a full-screen terminal. Equivalent to `nbstat --watch`.
+* **devicewatch** — continuously update information from the **devicestat** table in a full-screen terminal. Equivalent to `devicestat --watch`.
 
-The first column of each table (Notebook name for **nbstat** or device ID for **devicestat**) is referred in this documentation as *index*: we apply additional filterings/sortings based on it.
+The first column of each table (Notebook name for **nbstat** or device ID for **devicestat**) is referred in this documentation as *index*: we apply additional filtering/sorting based on it.
 
 
 ## Options
@@ -60,10 +60,10 @@ Options are separated into four sections:
     * By default, it is enabled if the table is refreshed continuously (`--watch`) and disabled otherwise.
 * `--add-separators`, `--hide-separators` — turn on/off all the table separators (lines between rows/columns).
     * By default, separators are enabled for **nbstat** and disabled for **devicestat**.
-* `--supress-color` — disable using colors in the displayed view.
+* `--suppress-color` — disable using colors in the displayed view.
 
 ### Other options
-* `-i`, `-n`, `--interval`, `--watch` — continuously update information from the table in a fullscreen terminal.
+* `-i`, `-n`, `--interval`, `--watch` — continuously update information from the table in a full-screen terminal.
     * If provided, a number sets the interval between ticks: `nbstat -i 0.2`.
 
 

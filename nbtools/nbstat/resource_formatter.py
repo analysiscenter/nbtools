@@ -48,6 +48,14 @@ class ResourceFormatter(list):
         except KeyError:
             return default
 
+    def __contains__(self, key):
+        """ Overloaded `in` operator. """
+        try:
+            self[key]
+            return True
+        except KeyError:
+            return False
+
     def __setitem__(self, key, value):
         """ If `key` is a resource (or an alias), set the values of `include` flag for this resource. """
         key = Resource.parse_alias(key)
@@ -157,6 +165,9 @@ NBSTAT_FORMATTER = ResourceFormatter([
     {'resource' : Resource.DEVICE_PROCESS_MEMORY_USED, 'include' : True},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
     {'resource' : Resource.DEVICE_UTIL, 'include' : True, 'min_width' : 5},
+    {'resource' : Resource.DEVICE_UTIL_BAR, 'include' : False, 'min_width' : 10},
+    {'resource' : Resource.DEVICE_UTIL_MA, 'include' : False, 'min_width' : 5},
+    {'resource' : Resource.DEVICE_UTIL_MA_BAR, 'include' : False, 'min_width' : 10},
     {'resource' : Resource.DEVICE_TEMP, 'include' : True, 'min_width' : 5},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
     {'resource' : Resource.DEVICE_POWER_USED, 'include' : False},
@@ -169,6 +180,9 @@ DEVICESTAT_FORMATTER = ResourceFormatter([
     {'resource' : Resource.DEVICE_ID, 'include' : True, 'hidable' : True},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
     {'resource' : Resource.DEVICE_UTIL, 'include' : True, 'hidable' : True, 'min_width' : 5},
+    {'resource' : Resource.DEVICE_UTIL_BAR, 'include' : False, 'min_width' : 10},
+    {'resource' : Resource.DEVICE_UTIL_MA, 'include' : False, 'min_width' : 5},
+    {'resource' : Resource.DEVICE_UTIL_MA_BAR, 'include' : False, 'min_width' : 10},
     {'resource' : Resource.DEVICE_TEMP, 'include' : True, 'hidable' : True, 'min_width' : 5},
     {'resource' : Resource.DEVICE_POWER_USED, 'include' : False, 'hidable' : True},
     {'resource' : Resource.DEVICE_FAN, 'include' : False, 'hidable' : True, 'min_width' : 4},

@@ -3,12 +3,14 @@ Also provides `nbwatch`, `devicestat` and `devicewatch` functions.
 """
 #pylint: disable=redefined-outer-name
 import sys
+import traceback
 from inspect import cleandoc
 from time import time, sleep
 from argparse import ArgumentParser, RawTextHelpFormatter
 
 from blessed import Terminal
 
+from .resource import Resource
 from .resource_formatter import NBSTAT_FORMATTER, DEVICESTAT_FORMATTER, GPUSTAT_FORMATTER
 from .resource_inspector import ResourceInspector
 
@@ -23,53 +25,109 @@ def main(name, interval=None):
     except Exception: # pylint: disable=broad-except
         pass
 
-    # Make parameters
+    # Make parameters for requested view
+    inspector = ResourceInspector()
     formatter, view_args = make_parameters(name)
-
-    # Create handler to get formatted table
-    inspector = ResourceInspector(formatter)
-    viewgetter = lambda: inspector.get_view(name, **view_args)
+    interval = view_args.pop('interval') or interval
 
     # Print table
-    interval = view_args.pop('interval') or interval
     if not interval:
-        output_once(viewgetter)
+        output_once(inspector, name, formatter, view_args)
     else:
-        output_looped(viewgetter, interval=interval)
+        # If in `watch` mode, prepare other handler as well
+        other_name = 'devicewatch' if name.startswith('nb') else 'nbwatch'
+
+        other_formatter, other_view_args = make_parameters(other_name)
+        other_view_args.pop('interval')
+
+        output_looped(inspector, name, formatter, view_args,
+                      other_name, other_formatter, other_view_args,
+                      interval=interval)
 
 
-def output_once(viewgetter):
-    """ Output visualization of `viewgetter` to a stdout once. """
+def output_once(inspector, name, formatter, view_args):
+    """ Output visualization to a stdout once. """
     try:
-        view = viewgetter()
+        view = inspector.get_view(name=name, formatter=formatter, **view_args)
         print(view)
     except Exception as e: # pylint: disable=broad-except
         _ = e
         print('Error on getting system information!' + str(e))
         raise e
 
-def output_looped(viewgetter, interval=0.5):
-    """ Output visualization of `viewgetter` to a stdout once each `interval` seconds in a fullscreen mode. """
+def output_looped(inspector, name, formatter, view_args,
+                  other_name, other_formatter, other_view_args, interval=0.5):
+    """ Output visualization to a stdout once each `interval` seconds in a fullscreen mode. """
     terminal = Terminal()
+    interval = max(interval, 0.1)
 
-    with terminal.fullscreen():
-        try:
+    initial_view_args = dict(view_args)
+    initial_other_view_args = dict(other_view_args)
+
+    with terminal.cbreak(), terminal.fullscreen():
+        try: # catches keyboard interrupts to exit gracefully
             counter = 0
             while True:
                 counter += 1
-                try:
+
+                try: # catches `nbstat` exceptions
+                    # Print the view
                     start_time = time()
-                    view = viewgetter()
+                    view = inspector.get_view(name=name, formatter=formatter, **view_args)
                     start_position = terminal.clear if counter % 10 == 0 else terminal.move(0, 0)
                     print(start_position, view, ' ', terminal.clear_eol, sep='')
 
+                    # Wait for the input key
                     remaining_time = interval - (time() - start_time)
                     if remaining_time > 0.0:
-                        sleep(remaining_time)
+                        inkey = terminal.inkey(timeout=remaining_time)
+                    else:
+                        inkey = terminal.inkey(timeout=interval)
 
-                except Exception as e: # pylint: disable=broad-except
-                    _ = e
-                    sys.stderr.write('Error on getting system information!' + str(e))
+                    if inkey:
+                        recognized = True
+
+                        # Tab to switch views. Re-print immediately
+                        if inkey.code in [terminal.KEY_TAB, terminal.KEY_BTAB]:
+                            # Swap every variable
+                            name, other_name = other_name, name
+                            formatter, other_formatter = other_formatter, formatter
+                            view_args, other_view_args = other_view_args, view_args
+                            initial_view_args, initial_other_view_args = initial_other_view_args, initial_view_args
+
+                        elif inkey == 's':
+                            view_args['separate_index'] = not view_args['separate_index']
+                        elif inkey == 'r':
+                            view_args = dict(initial_view_args)
+                        elif inkey == 'b':
+                            if formatter[Resource.DEVICE_UTIL] or formatter[Resource.DEVICE_UTIL_BAR]:
+                                x, y = formatter[Resource.DEVICE_UTIL], formatter[Resource.DEVICE_UTIL_BAR]
+                                formatter[Resource.DEVICE_UTIL] = y
+                                formatter[Resource.DEVICE_UTIL_BAR] = x
+
+                            if formatter[Resource.DEVICE_UTIL_MA] or formatter[Resource.DEVICE_UTIL_MA_BAR]:
+                                x, y = formatter[Resource.DEVICE_UTIL_MA], formatter[Resource.DEVICE_UTIL_MA_BAR]
+                                formatter[Resource.DEVICE_UTIL_MA] = y
+                                formatter[Resource.DEVICE_UTIL_MA_BAR] = x
+                        elif inkey == 'm':
+                            if formatter[Resource.DEVICE_UTIL]:
+                                formatter[Resource.DEVICE_UTIL_MA] = not formatter[Resource.DEVICE_UTIL_MA]
+                            if formatter[Resource.DEVICE_UTIL_BAR]:
+                                formatter[Resource.DEVICE_UTIL_MA_BAR] = not formatter[Resource.DEVICE_UTIL_MA_BAR]
+                        elif inkey == 'q':
+                            raise KeyboardInterrupt
+                        else:
+                            recognized = False
+
+                        if recognized:
+                            view = inspector.get_view(name=name, formatter=formatter, **view_args)
+                            print(terminal.clear, view, ' ', terminal.clear_eol, sep='')
+                        else:
+                            print(f'Unrecognized key={inkey}, code={inkey.code}.')
+
+                except Exception: # pylint: disable=broad-except
+                    sys.stderr.write(traceback.format_exc())
+                    sys.stderr.write('Error on getting system information!')
                     sys.exit(1)
 
         except KeyboardInterrupt:
@@ -213,12 +271,12 @@ def make_parameters(name):
 
     # Separators
     group_separators = parser.add_mutually_exclusive_group()
-    group_separators.add_argument('--add-separators', action='store_const', const=True, dest='separators',
+    group_separators.add_argument('--show-separators', action='store_const', const=True, dest='separators',
                                   help='Turn on all the table separators.')
     group_separators.add_argument('--hide-separators', action='store_const', const=False, dest='separators',
                                   help='Turn off all the table separators.')
 
-    parser.add_argument('--supress-color', action='store_const', const=False, dest='force_styling',
+    parser.add_argument('--suppress-color', action='store_const', const=False, dest='force_styling',
                         help='Disable colors in the visualization.')
 
     # Merge defaults and passed arguments
@@ -240,11 +298,12 @@ def make_parameters(name):
         formatter.include_all()
 
     for resource in args.pop('show'):
-        formatter[resource] = True
+        if resource in formatter:
+            formatter[resource] = True
 
     for resource in args.pop('hide'):
-        formatter[resource] = False
-
+        if resource in formatter:
+            formatter[resource] = False
 
     return formatter, args
 

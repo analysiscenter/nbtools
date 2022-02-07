@@ -79,7 +79,15 @@ class Resource(Enum):
     TABLE_DELIMITER1 = auto()
     TABLE_DELIMITER2 = auto()
     DEVICE_SHORT_ID = 'short_id'
+    DEVICE_UTIL_BAR = 'util_bar'
+
     USES_DEVICE = auto()
+    IS_PARENT = auto()
+
+    # Moving averages
+    DEVICE_UTIL_MA = 'util_ma'
+    DEVICE_UTIL_MA_BAR = 'util_ma_bar'
+
 
     def __repr__(self):
         return self.name
@@ -127,16 +135,20 @@ class Resource(Enum):
             style = terminal.yellow
         elif self == Resource.DEVICE_POWER_USED:
             style = terminal.magenta
-        elif self == Resource.DEVICE_UTIL:
+        elif self in [Resource.DEVICE_UTIL, Resource.DEVICE_UTIL_BAR]:
             style = terminal.green
+            string = 'UTIL'
+        elif self in [Resource.DEVICE_UTIL_MA, Resource.DEVICE_UTIL_MA_BAR]:
+            style = terminal.green
+            string = 'UTIL_AVERAGE'
         elif self == Resource.DEVICE_TEMP:
             style = terminal.red
 
         # Table elements
         elif self == Resource.TABLE_DELIMITER1:
-            string = '|'
+            string = '┃'
         elif self == Resource.TABLE_DELIMITER2:
-            string = '||'
+            string = '║'
 
         # Default values
         if style is None:

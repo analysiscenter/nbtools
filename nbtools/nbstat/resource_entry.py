@@ -56,7 +56,8 @@ class ResourceEntry(dict):
                     data = '~' + data.split('/')[-1]
 
         elif resource == Resource.CREATE_TIME:
-            data = datetime.fromtimestamp(data).strftime("%Y-%m-%d %H:%M:%S")
+            if data is not None:
+                data = datetime.fromtimestamp(data).strftime("%Y-%m-%d %H:%M:%S")
         elif resource == Resource.KERNEL:
             data = data.split('-')[0] if data is not None else 'N/A'
 
@@ -143,23 +144,50 @@ class ResourceEntry(dict):
                 power_total = self[Resource.DEVICE_POWER_TOTAL] // 1000
                 string = f'{power_used:>3}/{power_total:>3} W'
 
-        elif resource in [Resource.DEVICE_FAN, Resource.DEVICE_UTIL]:
+        elif resource in [Resource.DEVICE_FAN, Resource.DEVICE_UTIL, Resource.DEVICE_UTIL_MA]:
             if data is not None:
-                if data > 30:
+                if data >= 30:
                     style = terminal.bold
                 string = f'{data}%' # don't use the `％` symbol as it is not unit wide
 
+        elif resource in [Resource.DEVICE_UTIL_BAR, Resource.DEVICE_UTIL_MA_BAR]:
+            if resource == Resource.DEVICE_UTIL_BAR:
+                data = self.get(Resource.DEVICE_UTIL, None)
+            else:
+                data = self.get(Resource.DEVICE_UTIL_MA, None)
+
+            if data is not None:
+                if data >= 30:
+                    style = terminal.bold
+                else:
+                    style = ''
+
+                if data < 30:
+                    bar_color = terminal.on_red
+                elif data < 70:
+                    bar_color = terminal.on_yellow
+                else:
+                    bar_color = terminal.on_green
+
+                string = f'{data}%'
+                string = f'{string:^4}'.center(9)
+
+                split = data // 10
+                string_1 = f'{terminal.normal}{bar_color}{style}{string[:split]}'
+                string_2 = f'{terminal.normal}{style}{string[split:]}' # can add {terminal.on_white}
+                string = string_1 + string_2
+
         elif resource == Resource.DEVICE_TEMP:
             if data is not None:
-                if data > 40:
+                if data >= 40:
                     style = terminal.bold
                 string = f'{data}°C' # don't use the `℃` symbol as it is not unit wide
 
         # Table delimiters
         elif resource == Resource.TABLE_DELIMITER1:
-            string = '|'
+            string = '┃'
         elif resource == Resource.TABLE_DELIMITER2:
-            string = '||'
+            string = '║'
 
         # Default values
         if style is None:

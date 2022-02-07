@@ -102,6 +102,9 @@ class ResourceTable:
         from entries where values of `self_key` and `other_key` columns match. All of the entries in `self` remain.
         If no matched entry present in `other`, values of additional columns are set to None.
         """
+        if not other:
+            return self
+
         # Assert
         if self_key not in self.columns:
             raise ValueError(f'Key `{self_key}` is not found in `self`!')
