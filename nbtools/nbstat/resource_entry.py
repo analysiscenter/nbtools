@@ -38,6 +38,7 @@ class ResourceEntry(dict):
         kwargs : dict
             Other parameters for string creation like memory format, width, etc.
         """
+        #pylint: disable=too-many-statements
         resource = Resource.parse_alias(resource)
         default_string = '-'
         style, string = None, None
@@ -45,7 +46,8 @@ class ResourceEntry(dict):
 
         # Process description
         if resource in [Resource.PATH, Resource.CMDLINE, Resource.STATUS,
-                        Resource.PID, Resource.PPID, Resource.NGID, Resource.HOST_PID, Resource.PYTHON_PPID]:
+                        Resource.PID, Resource.PPID, Resource.NGID, Resource.HOST_PID, Resource.PYTHON_PPID,
+                        Resource.DEVICE_PROCESS_PID,]:
             pass
 
         elif resource in [Resource.NAME, Resource.TYPE]:
@@ -68,8 +70,7 @@ class ResourceEntry(dict):
                 data = process.cpu_percent()
                 data = round(data)
 
-                if data > 30:
-                    style = terminal.bold
+                style = terminal.bold if data > 30 else ''
                 string = f'{data}%' # don't use the `％` symbol as it is not unit wide
 
         elif resource == Resource.RSS:
@@ -96,10 +97,7 @@ class ResourceEntry(dict):
         # Device resources
         elif resource == Resource.DEVICE_MEMORY_USED:
             if data is not None:
-                if data > 10*1024*1024:
-                    style = terminal.bold
-                else:
-                    style = ''
+                style = terminal.bold if data > 10*1024*1024 else ''
 
                 memory_format = kwargs['device_memory_format']
                 used, unit = format_memory(data, format=memory_format)
@@ -113,10 +111,7 @@ class ResourceEntry(dict):
 
         elif resource == Resource.DEVICE_PROCESS_MEMORY_USED:
             if data is not None:
-                if data > 10*1024*1024:
-                    style = terminal.bold
-                else:
-                    style = ''
+                style = terminal.bold if data > 10*1024*1024 else ''
 
                 memory_format = kwargs['device_memory_format']
                 used_process, unit = format_memory(data, format=memory_format)
@@ -146,41 +141,27 @@ class ResourceEntry(dict):
 
         elif resource in [Resource.DEVICE_FAN, Resource.DEVICE_UTIL, Resource.DEVICE_UTIL_MA]:
             if data is not None:
-                if data >= 30:
-                    style = terminal.bold
+                style = terminal.bold if data >= 30 else ''
                 string = f'{data}%' # don't use the `％` symbol as it is not unit wide
 
-        elif resource in [Resource.DEVICE_UTIL_BAR, Resource.DEVICE_UTIL_MA_BAR]:
-            if resource == Resource.DEVICE_UTIL_BAR:
-                data = self.get(Resource.DEVICE_UTIL, None)
-            else:
-                data = self.get(Resource.DEVICE_UTIL_MA, None)
+                if kwargs['bar']:
+                    if data < 30:
+                        bar_color = terminal.on_red
+                    elif data < 70:
+                        bar_color = terminal.on_yellow
+                    else:
+                        bar_color = terminal.on_green
 
-            if data is not None:
-                if data >= 30:
-                    style = terminal.bold
-                else:
-                    style = ''
+                    string = f'{string:^4}'.center(9)
 
-                if data < 30:
-                    bar_color = terminal.on_red
-                elif data < 70:
-                    bar_color = terminal.on_yellow
-                else:
-                    bar_color = terminal.on_green
-
-                string = f'{data}%'
-                string = f'{string:^4}'.center(9)
-
-                split = data // 10
-                string_1 = f'{terminal.normal}{bar_color}{style}{string[:split]}'
-                string_2 = f'{terminal.normal}{style}{string[split:]}' # can add {terminal.on_white}
-                string = string_1 + string_2
+                    split = data // 10
+                    string_1 = f'{terminal.normal}{bar_color}{style}{string[:split]}'
+                    string_2 = f'{terminal.normal}{style}{string[split:]}' # can add {terminal.on_white}
+                    string = string_1 + string_2
 
         elif resource == Resource.DEVICE_TEMP:
             if data is not None:
-                if data >= 40:
-                    style = terminal.bold
+                style = terminal.bold if data >= 40 else ''
                 string = f'{data}°C' # don't use the `℃` symbol as it is not unit wide
 
         # Table delimiters

@@ -1,4 +1,4 @@
-""" !!. """
+""" NBstat module: monitoring running Python processes and Notebooks. """
 #pylint: disable=wildcard-import
 from .resource import Resource
 from .resource_entry import ResourceEntry

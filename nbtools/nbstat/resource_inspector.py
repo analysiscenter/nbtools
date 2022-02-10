@@ -3,8 +3,6 @@ import os
 import re
 import json
 import time
-import platform
-import linecache
 
 import psutil
 import requests
@@ -14,71 +12,13 @@ import nvidia_smi
 
 from .resource import Resource
 from .resource_table import ResourceTable
-from .utils import format_memory
+from .utils import format_memory, pid_to_name, pid_to_ngid, true_len, true_rjust, true_center, FiniteList
+
 
 
 KERNEL_ID_SEARCHER   = re.compile('kernel-(.*).json').search
 VSCODE_KEY_SEARCHER  = re.compile('key=b"(.*)"').search
 SCRIPT_NAME_SEARCHER = re.compile('python.* (.*).py').search
-
-SYSTEM = platform.system()
-
-def pid_to_name_generic(pid):
-    """ Get `name` of a process by its PID. Platform-agnostic. """
-    try:
-        process = psutil.Process(pid)
-        name = process.name()
-    except (psutil.AccessDenied, psutil.ZombieProcess, psutil.NoSuchProcess):
-        name = ''
-    return name
-
-def pid_to_name_linux(pid):
-    """ Get `name` of a process by its PID on Linux. ~20% speed-up, compared to the `generic` version. """
-    try:
-        line = linecache.getline(f'/proc/{pid}/status', 1)
-        name = line.strip().split()[1]
-    except Exception: #pylint: disable=broad-except
-        name = ''
-    return name
-
-pid_to_name = pid_to_name_linux if SYSTEM == 'Linux' else pid_to_name_generic
-
-
-def pid_to_ngid_generic(pid):
-    """ Get NGID of a process by its PID. """
-    return pid
-
-def pid_to_ngid_linux(pid):
-    """ Get NGID of a process by its PID on Linux. Used as the PID on host for a process inside a container. """
-    try:
-        line = linecache.getline(f'/proc/{pid}/status', 5)
-        ngid = line.strip().split()[1]
-        ngid = int(ngid)
-    except Exception: #pylint: disable=broad-except
-        ngid = pid
-    return ngid or pid
-
-pid_to_ngid = pid_to_ngid_linux if SYSTEM == 'Linux' else pid_to_ngid_generic
-
-
-class FiniteList(list):
-    """ List with finite number of elements: if the size is more """
-    def __init__(self, *args, size=10, **kwargs):
-        self.size = size
-        super().__init__(*args, **kwargs)
-
-    def append(self, obj):
-        if len(self) >= self.size:
-            self.pop(0)
-        super().append(obj)
-
-    def get_average(self, size=None):
-        size = size or self.size
-        if len(self) > size // 2:
-            sublist = self[-size:]
-            return round(sum(sublist) / len(sublist))
-        return None
-
 
 
 class ResourceInspector:
@@ -141,9 +81,7 @@ class ResourceInspector:
 
             # Inseparable device information like memory, temperature, power, etc. Request it only if needed
             if (formatter.get(Resource.DEVICE_UTIL, False) or
-                formatter.get(Resource.DEVICE_UTIL_BAR, False) or
-                formatter.get(Resource.DEVICE_UTIL_MA, False) or
-                formatter.get(Resource.DEVICE_UTIL_MA_BAR, False)):
+                formatter.get(Resource.DEVICE_UTIL_MA, False)):
                 utilization = nvidia_smi.nvmlDeviceGetUtilizationRates(handle)
                 common_info[Resource.DEVICE_UTIL] = utilization.gpu
                 common_info[Resource.DEVICE_MEMORY_UTIL] = utilization.memory
@@ -520,7 +458,7 @@ class ResourceInspector:
 
     # Make formatted visualization of tables
     def get_view(self, name='nbstat', formatter=None, index_condition=None, force_styling=True,
-                 sort=True, verbose=0, window=20,
+                 sort=True, verbose=0, window=20, interval=None,
                  add_supheader=True, underline_supheader=True, bold_supheader=True, separate_supheader=False,
                  add_header=True, underline_header=True, bold_header=False, separate_header=True,
                  add_footnote=False, underline_footnote=False, bold_footnote=False, separate_footnote=True,
@@ -557,7 +495,7 @@ class ResourceInspector:
                              process_memory_format=process_memory_format, device_memory_format=device_memory_format)
 
         if add_supheader:
-            lines = self.add_supheader(lines, terminal=terminal,
+            lines = self.add_supheader(lines, terminal=terminal, interval=interval,
                                        underline=underline_supheader, bold=bold_supheader, separate=separate_supheader)
         if add_footnote:
             lines = self.add_footnote(lines, terminal=terminal,
@@ -580,10 +518,16 @@ class ResourceInspector:
         terminal = Terminal(kind=os.getenv('TERM'), force_styling=force_styling if force_styling else None)
         terminal.separator_symbol = terminal.bold + separator + terminal.normal
         terminal._normal = '\x1b[0;10m' # pylint: disable=protected-access
+
+        # Change some methods to a faster versions
+        terminal.length = true_len
+        terminal.rjust = true_rjust
+        terminal.center = true_center
         return terminal
 
     def add_line(self, lines, parts, terminal, position, separator_position, underline, bold):
         """ Add line, created from joined `parts`, to `lines`, in desired `position`. """
+        parts = [part for part in parts if part]
         if underline:
             parts = [terminal.underline + part for part in parts]
         if bold:
@@ -604,16 +548,18 @@ class ResourceInspector:
             lines.insert(separator_position, terminal.separator_symbol * terminal.length(added_line))
         return lines
 
-    def add_supheader(self, lines, terminal, underline=True, bold=True, separate=True):
+    def add_supheader(self, lines, terminal, interval=None, underline=True, bold=True, separate=True):
         """ Add a supheader with info about current time, driver and CUDA versions. """
         timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+        interval_info = f'Interval: {interval:2.1f}s' if interval is not None else ''
         driver_version = '.'.join(nvidia_smi.nvmlSystemGetDriverVersion().decode().split('.')[:-1])
         cuda_version = nvidia_smi.nvmlSystemGetNVMLVersion().decode()[:4]
 
         parts = [
             timestamp,
             f'Driver Version: {driver_version}',
-            f'CUDA Version: {cuda_version}'
+            f'CUDA Version: {cuda_version}',
+            interval_info,
         ]
         lines = self.add_line(lines=lines, parts=parts, terminal=terminal,
                               position=0, separator_position=1 if separate else None,

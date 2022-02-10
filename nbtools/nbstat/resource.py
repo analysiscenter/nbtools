@@ -72,21 +72,19 @@ class Resource(Enum):
 
     # Aggregated process info
     DEVICE_PROCESS_N = auto()
-    DEVICE_PROCESS_PID = auto()
+    DEVICE_PROCESS_PID = 'device_pid'
     DEVICE_PROCESS_MEMORY_USED = 'process_memory'
 
     # Used for better repr in formatter tables
     TABLE_DELIMITER1 = auto()
     TABLE_DELIMITER2 = auto()
     DEVICE_SHORT_ID = 'short_id'
-    DEVICE_UTIL_BAR = 'util_bar'
 
     USES_DEVICE = auto()
     IS_PARENT = auto()
 
     # Moving averages
     DEVICE_UTIL_MA = 'util_ma'
-    DEVICE_UTIL_MA_BAR = 'util_ma_bar'
 
 
     def __repr__(self):
@@ -127,6 +125,8 @@ class Resource(Enum):
         elif self == Resource.DEVICE_SHORT_ID:
             style = terminal.blue
             string = 'DEVICE ID'
+        elif self == Resource.DEVICE_PROCESS_PID:
+            string = 'DEVICE PID'
 
         # Device resources
         elif self == Resource.DEVICE_MEMORY_USED:
@@ -135,12 +135,12 @@ class Resource(Enum):
             style = terminal.yellow
         elif self == Resource.DEVICE_POWER_USED:
             style = terminal.magenta
-        elif self in [Resource.DEVICE_UTIL, Resource.DEVICE_UTIL_BAR]:
+        elif self in [Resource.DEVICE_UTIL]:
             style = terminal.green
             string = 'UTIL'
-        elif self in [Resource.DEVICE_UTIL_MA, Resource.DEVICE_UTIL_MA_BAR]:
+        elif self in [Resource.DEVICE_UTIL_MA]:
             style = terminal.green
-            string = 'UTIL_AVERAGE'
+            string = 'UTIL AVERAGE'
         elif self == Resource.DEVICE_TEMP:
             style = terminal.red
 

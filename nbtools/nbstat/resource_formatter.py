@@ -51,7 +51,7 @@ class ResourceFormatter(list):
     def __contains__(self, key):
         """ Overloaded `in` operator. """
         try:
-            self[key]
+            _ = self[key]
             return True
         except KeyError:
             return False
@@ -132,6 +132,12 @@ class ResourceFormatter(list):
         return [Resource.RESOURCE_TO_ALIAS[item['resource']] for item in self
                 if item['include'] is False and 'TABLE_DELIMITER' not in item['resource'].name]
 
+    def toggle_bars(self):
+        """ Change resources to use `bar` representation. """
+        for item in self:
+            if 'bar' in item:
+                item['bar'] = not item['bar']
+
 
 NBSTAT_FORMATTER = ResourceFormatter([
     # Notebook/script name
@@ -161,13 +167,12 @@ NBSTAT_FORMATTER = ResourceFormatter([
     # Process device usage
     {'resource' : Resource.TABLE_DELIMITER2, 'include' : True},
     {'resource' : Resource.DEVICE_SHORT_ID, 'include' : True},
+    {'resource' : Resource.DEVICE_PROCESS_PID, 'include' : False},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
     {'resource' : Resource.DEVICE_PROCESS_MEMORY_USED, 'include' : True},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
-    {'resource' : Resource.DEVICE_UTIL, 'include' : True, 'min_width' : 5},
-    {'resource' : Resource.DEVICE_UTIL_BAR, 'include' : False, 'min_width' : 10},
-    {'resource' : Resource.DEVICE_UTIL_MA, 'include' : False, 'min_width' : 5},
-    {'resource' : Resource.DEVICE_UTIL_MA_BAR, 'include' : False, 'min_width' : 10},
+    {'resource' : Resource.DEVICE_UTIL, 'include' : True, 'min_width' : 5, 'bar': False},
+    {'resource' : Resource.DEVICE_UTIL_MA, 'include' : False, 'min_width' : 5, 'bar': False},
     {'resource' : Resource.DEVICE_TEMP, 'include' : True, 'min_width' : 5},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
     {'resource' : Resource.DEVICE_POWER_USED, 'include' : False},
@@ -179,10 +184,8 @@ DEVICESTAT_FORMATTER = ResourceFormatter([
     # Device usage
     {'resource' : Resource.DEVICE_ID, 'include' : True, 'hidable' : True},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
-    {'resource' : Resource.DEVICE_UTIL, 'include' : True, 'hidable' : True, 'min_width' : 5},
-    {'resource' : Resource.DEVICE_UTIL_BAR, 'include' : False, 'min_width' : 10},
-    {'resource' : Resource.DEVICE_UTIL_MA, 'include' : False, 'min_width' : 5},
-    {'resource' : Resource.DEVICE_UTIL_MA_BAR, 'include' : False, 'min_width' : 10},
+    {'resource' : Resource.DEVICE_UTIL, 'include' : True, 'hidable' : True, 'min_width' : 5, 'bar': False},
+    {'resource' : Resource.DEVICE_UTIL_MA, 'include' : False, 'min_width' : 5, 'bar': False},
     {'resource' : Resource.DEVICE_TEMP, 'include' : True, 'hidable' : True, 'min_width' : 5},
     {'resource' : Resource.DEVICE_POWER_USED, 'include' : False, 'hidable' : True},
     {'resource' : Resource.DEVICE_FAN, 'include' : False, 'hidable' : True, 'min_width' : 4},
@@ -203,6 +206,7 @@ DEVICESTAT_FORMATTER = ResourceFormatter([
     {'resource' : Resource.PPID, 'include' : False},
     {'resource' : Resource.NGID, 'include' : False},
     {'resource' : Resource.PYTHON_PPID, 'include' : False},
+    {'resource' : Resource.DEVICE_PROCESS_PID, 'include' : True},
     {'resource' : Resource.HOST_PID, 'include' : False},
     {'resource' : Resource.KERNEL, 'include' : False},
     {'resource' : Resource.STATUS, 'include' : False},
@@ -220,7 +224,7 @@ GPUSTAT_FORMATTER = ResourceFormatter([
     # Device usage
     {'resource' : Resource.DEVICE_ID, 'include' : True},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
-    {'resource' : Resource.DEVICE_UTIL, 'include' : True, 'min_width': 5},
+    {'resource' : Resource.DEVICE_UTIL, 'include' : True, 'min_width': 5, 'bar': False},
     {'resource' : Resource.DEVICE_TEMP, 'include' : True, 'min_width': 5},
     {'resource' : Resource.DEVICE_POWER_USED, 'include' : False},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},

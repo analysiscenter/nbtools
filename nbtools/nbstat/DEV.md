@@ -16,8 +16,8 @@ Before writing any code, I had following goals and requirements in mind:
 Below I explain how these goals are achieved and which code is responsible for what. At the end of this page, you can see a list of possible further improvements.
 
 
-## Roles
-There are three main purposes of each implemented primitive:
+## General idea
+On a high level, `nbstat` collects information about Python processes, running Jupyter notebooks and NVIDIA devices into tables, combines them into one view and transforms it in a colored string. For each of the primitives, there are three main purposes:
 * Define structure of the resulting view:
     * `ResourceFormatter` — defines both *which* resources to request from the system and *how* to display them.
 * Collect information from system.
@@ -88,7 +88,7 @@ Going from the very bottom to the top, I use following class structure:
 Other that those primitives, it is worth to mention:
 * [`blessed.Terminal`](https://github.com/jquast/blessed) is used for interacting with terminal, adding colors and other control sequences to the formatted strings
     * `length` and `rjust` methods are absolutely amazing and are actual blessing.
-* `cli.py` contains parsing of command line arguments.
+* `cli.py` contains parsing of command line arguments and logic for working with keystrokes in full-screen terminal mode.
 
 Along the code, I've left a lot of dev comments and docstrings. The recommended order of reading it should be:
 * resource_inspector.py
@@ -96,9 +96,9 @@ Along the code, I've left a lot of dev comments and docstrings. The recommended 
 * resource_formatter.py
 * resource_table.py
 * resource_entry.py
+* cli.py
 
 ## Adding new Resources
-
 To add new tracked property, one should:
 * add it to `Resource` enumeration.
 * add a way to collect it in either of `ResourceInspector.get_*_table` methods.

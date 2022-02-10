@@ -1,11 +1,11 @@
 """ Command line interface of `nbstat`.
 Also provides `nbwatch`, `devicestat` and `devicewatch` functions.
 """
-#pylint: disable=redefined-outer-name
+#pylint: disable=redefined-outer-name, too-many-nested-blocks
 import sys
 import traceback
 from inspect import cleandoc
-from time import time, sleep
+from time import time
 from argparse import ArgumentParser, RawTextHelpFormatter
 
 from blessed import Terminal
@@ -28,7 +28,11 @@ def main(name, interval=None):
     # Make parameters for requested view
     inspector = ResourceInspector()
     formatter, view_args = make_parameters(name)
-    interval = view_args.pop('interval') or interval
+
+    # Parse interval
+    interval = view_args.get('interval') or interval
+    interval = max(interval, 0.1) if interval is not None else None
+    view_args['interval'] = interval
 
     # Print table
     if not interval:
@@ -36,9 +40,8 @@ def main(name, interval=None):
     else:
         # If in `watch` mode, prepare other handler as well
         other_name = 'devicewatch' if name.startswith('nb') else 'nbwatch'
-
         other_formatter, other_view_args = make_parameters(other_name)
-        other_view_args.pop('interval')
+        other_view_args['interval'] = interval
 
         output_looped(inspector, name, formatter, view_args,
                       other_name, other_formatter, other_view_args,
@@ -59,7 +62,6 @@ def output_looped(inspector, name, formatter, view_args,
                   other_name, other_formatter, other_view_args, interval=0.5):
     """ Output visualization to a stdout once each `interval` seconds in a fullscreen mode. """
     terminal = Terminal()
-    interval = max(interval, 0.1)
 
     initial_view_args = dict(view_args)
     initial_other_view_args = dict(other_view_args)
@@ -100,20 +102,10 @@ def output_looped(inspector, name, formatter, view_args,
                         elif inkey == 'r':
                             view_args = dict(initial_view_args)
                         elif inkey == 'b':
-                            if formatter[Resource.DEVICE_UTIL] or formatter[Resource.DEVICE_UTIL_BAR]:
-                                x, y = formatter[Resource.DEVICE_UTIL], formatter[Resource.DEVICE_UTIL_BAR]
-                                formatter[Resource.DEVICE_UTIL] = y
-                                formatter[Resource.DEVICE_UTIL_BAR] = x
-
-                            if formatter[Resource.DEVICE_UTIL_MA] or formatter[Resource.DEVICE_UTIL_MA_BAR]:
-                                x, y = formatter[Resource.DEVICE_UTIL_MA], formatter[Resource.DEVICE_UTIL_MA_BAR]
-                                formatter[Resource.DEVICE_UTIL_MA] = y
-                                formatter[Resource.DEVICE_UTIL_MA_BAR] = x
+                            formatter.toggle_bars()
                         elif inkey == 'm':
                             if formatter[Resource.DEVICE_UTIL]:
                                 formatter[Resource.DEVICE_UTIL_MA] = not formatter[Resource.DEVICE_UTIL_MA]
-                            if formatter[Resource.DEVICE_UTIL_BAR]:
-                                formatter[Resource.DEVICE_UTIL_MA_BAR] = not formatter[Resource.DEVICE_UTIL_MA_BAR]
                         elif inkey == 'q':
                             raise KeyboardInterrupt
                         else:
@@ -174,6 +166,7 @@ VIEW_TO_FORMATTER = {
 DEFAULTS = {
     'index_condition' : None,
     'interval' : 0.0,
+    'window': 20,
     'verbose' : 0,
 
     'show_all' : False,
@@ -195,7 +188,9 @@ DEFAULTS = {
 }
 
 def make_parameters(name):
-    """ Parse parameters from command line into dictionary. """
+    """ Parse parameters from command line into dictionary.
+    Use `store_const` instad of `store_true` to keep `None` values, if not passed explicitly
+    """
     # Set defaults
     defaults = dict(DEFAULTS)
     if 'device' in name:
@@ -208,12 +203,25 @@ def make_parameters(name):
     view = NAME_TO_VIEW[name]
     formatter = VIEW_TO_FORMATTER[view]
 
-    # Parse command line arguments
-    # Use `store_const` instad of `store_true` to keep `None` values, if not passed explicitly
+    # Command line arguments
+    argv = sys.argv[1:]
+    if 'device' in name:
+        argv = [arg for arg in argv if arg not in ['-v', '-V']]
+
+
+    # General doc
     docstring = cleandoc(globals()[name].__doc__)
-    help_verbose_0 = '\nDefault `verbose=0` shows only script/notebooks that use devices.' if 'nb' in name else ''
+    help_verbose_0 = 'Default `verbose=0` shows only script/notebooks that use devices.' if 'nb' in name else ''
+    help_watch = '\nSet `interval` to continuously update displayed table.' if 'watch' not in name else '\n'
+    help_keystrokes = (
+        'While in the `watch` mode, you can use keystrokes to modify displayed view:'
+        '\n  - `tab` — swaps views, from `nbwatch` to `devicewatch` and back.'
+        '\n  - `b` — toggles bar representation for some of the resources: in addition to its value, show colored bar.'
+        '\n  - `m` — toggles moving averages for some of the resources: values are averaged across the last iterations.'
+        '\n  - `s` — toggles table separators.')
+    parser = ArgumentParser(description='\n'.join([docstring, help_verbose_0, help_watch, help_keystrokes]),
+                            formatter_class=RawTextHelpFormatter)
     linesep = '\n '
-    parser = ArgumentParser(description=f'{docstring} {help_verbose_0 }', formatter_class=RawTextHelpFormatter)
 
     # Positional argument: filtering condition on index
     parser.add_argument('index_condition', nargs='?',
@@ -234,7 +242,10 @@ def make_parameters(name):
     else:
         help_interval = ('If provided, then the watch mode is used. '
                          'Value sets the interval (in seconds) between table updates.')
-    parser.add_argument('-i', '--interval', '-n', '--watch', nargs='?', type=float, help=help_interval + linesep)
+    parser.add_argument('-i', '--interval', '-n', '--watch', nargs='?', type=float, help=help_interval)
+
+    help_window = 'Number of table updates to use for computing moving averages.'
+    parser.add_argument('-w', '--window', nargs='?', type=int, help=help_window + linesep)
 
     # Show / hide columns by their aliases
     help_show = ('Additional columns to gather information about and show in the table.\n'
@@ -281,7 +292,6 @@ def make_parameters(name):
 
     # Merge defaults and passed arguments
     parser.set_defaults(**defaults)
-    argv = list(sys.argv[1:])
     args = vars(parser.parse_args(argv))
 
     # Update

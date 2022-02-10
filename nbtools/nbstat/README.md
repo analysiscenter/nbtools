@@ -8,7 +8,6 @@ For more in-depth look at the inner workings, device choices and motivation behi
 
 
 ## Views
-
 The **nbstat** table information is, roughly: *for each Jupyter Notebook show all of its processes with system/device utilization information.*
 
  Along with the **nbstat**, we provide following commands:
@@ -21,7 +20,6 @@ The first column of each table (Notebook name for **nbstat** or device ID for **
 
 
 ## Options
-
 Options are separated into four sections:
 
 * Main options to filter the table and control how many processes are shown.
@@ -58,14 +56,22 @@ Options are separated into four sections:
 * `--hide-header` — by default, we show a row with column names in the table. Use this parameter to change this behavior.
 * `--show-footnote`, `--hide-footnote` — show a row with total system resource usage.
     * By default, it is enabled if the table is refreshed continuously (`--watch`) and disabled otherwise.
-* `--add-separators`, `--hide-separators` — turn on/off all the table separators (lines between rows/columns).
+* `--show-separators`, `--hide-separators` — turn on/off all the table separators (lines between rows/columns).
     * By default, separators are enabled for **nbstat** and disabled for **devicestat**.
 * `--suppress-color` — disable using colors in the displayed view.
 
 ### Other options
 * `-i`, `-n`, `--interval`, `--watch` — continuously update information from the table in a full-screen terminal.
     * If provided, a number sets the interval between ticks: `nbstat -i 0.2`.
+* `-w`, `--window` — number of table updates to use for computing moving averages.
 
+
+## Keystrokes
+While in the `watch` mode, you can use keystrokes to change the displayed view:
+* `tab` — swaps views, from `nbwatch` to `devicewatch` and back.
+* `b` — toggles bar representation for some of the resources: in addition to its value, show colored bar.
+* `m` — toggles moving average column for some of the resources: values are averaged across the latest iterations.
+* `s` — toggles table separators.
 
 ## Sort
 The **nbstat** table is sorted in the following way:
@@ -85,4 +91,4 @@ Using plain **nbwatch** is enough to monitor your usual ML applications. In some
     * Adding `--show pid ppid` can be nice to navigate through large number of processes.
 
 ## Using as a Python library
-Sometimes, it is desired to get **nbstat** / **devicestat** information as a Python object to parse it manually. You can learn how to do it in the [tutorial](!!.).
+Sometimes, it is desired to get **nbstat** / **devicestat** information as a Python object to parse it manually. You can learn how to do it in the [tutorial](../../tutorials/NBstat.ipynb).
