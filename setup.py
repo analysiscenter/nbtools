@@ -14,7 +14,7 @@ with open('README.md', 'r') as f:
 
 
 setup(
-    name='nbtools',
+    name='py-nbtools',
     packages=find_packages(),
     version=version,
     url='https://github.com/analysiscenter/nbtools',

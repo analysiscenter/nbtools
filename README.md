@@ -3,7 +3,7 @@ Collection of tools for monitoring running Jupyter Notebooks and interacting wit
 
 The installation should be as easy as:
 ```
-pip install nbtools
+pip install py-nbtools
 ```
 
 
