@@ -1,9 +1,10 @@
 """ Utility functions. """
 #pylint: disable=redefined-builtin
 import re
-import psutil
 import platform
 import linecache
+
+import psutil
 
 
 
@@ -46,7 +47,6 @@ def pid_to_ngid_linux(pid):
     return ngid or pid
 
 pid_to_ngid = pid_to_ngid_linux if SYSTEM == 'Linux' else pid_to_ngid_generic
-
 
 
 
@@ -93,7 +93,6 @@ class FiniteList(list):
             sublist = self[-size:]
             return round(sum(sublist) / len(sublist))
         return None
-
 
 
 

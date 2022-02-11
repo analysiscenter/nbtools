@@ -144,7 +144,7 @@ class ResourceEntry(dict):
                 style = terminal.bold if data >= 30 else ''
                 string = f'{data}%' # don't use the `％` symbol as it is not unit wide
 
-                if kwargs['bar']:
+                if kwargs.get('bar'):
                     if data < 30:
                         bar_color = terminal.on_red
                     elif data < 70:

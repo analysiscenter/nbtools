@@ -9,20 +9,33 @@ pip install nbtools
 
 ## **NBstat**
 
-The main tool of this package is **nbstat** / **nbwatch** command line utility. It is added at installation and shows the detailed resource utilization for each process of each running Jupyter Notebook.
+The main tool of this package is **nbstat** / **nbwatch** command line utility. It is added at installation and shows the detailed resource utilization for each process of each running Jupyter Notebook. A gif is worth a thousand words:
 
-Full [user documentation:](nbtools/nbstat/README.md) explanation of different table views, command line options and ready-to-use snippets.
+<img src="images/nbwatch.gif" width="90%"/>
 
-<img src="images/nbstat.gif" width="100%"/>
+While in the `watch` mode, you can hit buttons to modify the displayed view:
 
-We also add the **devicestat** and **devicewatch** commands that show transposed information.
+* `tab` — swaps views, from `nbwatch` to `devicewatch` and back.
+* `b` — toggles bar representation for some of the resources: in addition to its value, show colored bar.
+* `m` — toggles moving average column for some of the resources: values are averaged across the latest iterations.
+* `s` — toggles table separators.
 
-<details>
-  <summary>devicestat</summary>
+We also add the **devicestat** and **devicewatch** commands that show transposed view with the same information and parameters.
 
-devicestat gif
-</details>
+For more information, check out the full [user documentation:](nbtools/nbstat/README.md) explanation of different table views, command line options and ready-to-use snippets.
 
+
+### PID namespaces and user permissions
+A [known problem](https://github.com/NVIDIA/nvidia-docker/issues/179) of NVIDIA drivers is that **nvidia-smi** reports PIDs of processes on devices in the global namespace, not in the container namespace, which does not allow to match PIDs of container processes to their device PIDs. There are a few workarounds:
+* pass `--pid=host` flag to `docker run`.
+* patch NVIDIA driver to handle PID namespaces correctly.
+* [Linux only] fallback on manually inspecting */proc/PID/* files to identify the host PID for each process inside of the container.
+
+While `nbstat` provides several fallbacks for `Linux` containers (and intend to provide support for more environments over time), the bullet-proof way is to use `--pid=host` option for `docker run`.
+
+The same goes for user permissions: in order to inspect certain properties of processes, we rely on having all necessary permissions already provided at command run.
+
+### Contribute
 If you are interested to contribute, check out the [developer/contributor page.](nbtools/nbstat/DEV.md) It contains detailed description about inner workings of the library, my design choices and motivation behind them, as well as discussion of complexities along the way.
 
 
@@ -39,7 +52,7 @@ pylint_notebook(path_to_ipynb,             # If not provided, use path to the cu
                 enable='import-error')     # Enable  specified Pylint checks. Can be a list.
 ```
 
-Under the hood, it converts `.ipynb` notebook to `.py` script, creates a custom `.pylintrc` configuration, runs the `pylint` and removes all temporary files. Learn more about its usage in the [tutorial.](!!.)
+Under the hood, it converts `.ipynb` notebook to `.py` script, creates a custom `.pylintrc` configuration, runs the `pylint` and removes all temporary files. Learn more about its usage in the [tutorial.](tutorials/NBstat.ipynb)
 
 
 ## **set_gpus**
