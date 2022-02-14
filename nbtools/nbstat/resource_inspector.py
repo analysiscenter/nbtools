@@ -425,7 +425,7 @@ class ResourceInspector:
             self.warnings['missing_device_pids'] = missing_pids
 
             if add_to_table:
-                entry_template = {key : None for key in table.columns}
+                entry_template = {key : None for key in table.columns or []}
                 for missing_pid in sorted(missing_pids):
                     entry = {
                         **entry_template,
