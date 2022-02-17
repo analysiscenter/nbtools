@@ -89,4 +89,4 @@ Another goal of the project is to show how to communicate with Jupyter API on re
 ## Acknowledgements
 The **nbstat** module builds on [**gpustat**](https://github.com/wookayin/gpustat) package. Using the **gpustat** for years gave me an idea about possible improvements, which are implemented in this library. While the implementation is different, reading through the code of **gpustat** was essential for development.
 
-Animated GIFs are created by using [Terminalizer](https://github.com/faressoft/terminalizer): aside from usual problems with installation, the tool itself is great.
+Animated GIFs are created by using [Terminalizer](https://github.com/faressoft/terminalizer): aside from the usual problems with installation, the tool itself is amazing.

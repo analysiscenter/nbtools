@@ -19,7 +19,7 @@ setup(
     version=version,
     url='https://github.com/analysiscenter/nbtools',
     license='Apache License 2.0',
-    author='Serget Tsimfer',
+    author='Sergey Tsimfer',
     author_email='sergeytsimfer@gmail.com',
     description='A collection of tools for using inside Jupyter Notebooks',
     long_description=long_description,

@@ -13,6 +13,7 @@ from blessed import Terminal
 from .resource import Resource
 from .resource_formatter import NBSTAT_FORMATTER, DEVICESTAT_FORMATTER, GPUSTAT_FORMATTER
 from .resource_inspector import ResourceInspector
+from .utils import true_len
 
 
 
@@ -69,14 +70,25 @@ def output_looped(inspector, name, formatter, view_args,
     with terminal.cbreak(), terminal.fullscreen():
         try: # catches keyboard interrupts to exit gracefully
             counter = 0
+            prev_len = 0
+
             while True:
                 counter += 1
 
                 try: # catches `nbstat` exceptions
-                    # Print the view
+                    # Get the view
                     start_time = time()
                     view = inspector.get_view(name=name, formatter=formatter, **view_args)
-                    start_position = terminal.clear if counter % 10 == 0 else terminal.move(0, 0)
+                    current_len = true_len(view)
+
+                    # Select starting position: if needed, redraw the entire screen, otherwise just move cursor position
+                    if abs(current_len - prev_len) > 100:
+                        start_position = terminal.clear
+                    else:
+                        start_position = terminal.move(0, 0)
+                    prev_len = current_len
+
+                    # Actual print
                     print(start_position, view, ' ', terminal.clear_eol, sep='')
 
                     # Wait for the input key

@@ -296,6 +296,16 @@ class ResourceInspector:
 
             except (psutil.AccessDenied, psutil.ZombieProcess, psutil.NoSuchProcess, FileNotFoundError):
                 continue
+
+        # Postprocess the table: update some entries with info from the others
+        for entry in process_table:
+            if entry[Resource.NAME] == 'unknown' and 'multiprocess' in entry[Resource.CMDLINE]:
+                ppid = entry[Resource.PPID]
+
+                for entry_ in process_table:
+                    if entry_[Resource.PID] == ppid and entry_[Resource.PYTHON_PPID] == -1:
+                        entry.update({key : entry_[key] for key in [Resource.NAME, Resource.PATH, Resource.KERNEL]})
+
         return process_table
 
 
@@ -427,11 +437,13 @@ class ResourceInspector:
             if add_to_table:
                 entry_template = {key : None for key in table.columns or []}
                 for missing_pid in sorted(missing_pids):
+                    name = 'non-python' if psutil.pid_exists(missing_pid) else 'device_zombie'
+
                     entry = {
                         **entry_template,
-                        Resource.NAME : 'device_zombie',
-                        Resource.TYPE : 'device_zombie',
-                        Resource.PATH : 'device_zombie',
+                        Resource.NAME : name,
+                        Resource.TYPE : name,
+                        Resource.PATH : name,
                         Resource.STATUS : 'sleeping',
                         Resource.PID : missing_pid,
                         Resource.PPID : missing_pid,
@@ -451,9 +463,10 @@ class ResourceInspector:
             if entry[Resource.DEVICE_PROCESS_PID] is not None and entry[Resource.HOST_PID] is None:
                 self.warnings['missing_device_pids'].add(entry[Resource.DEVICE_PROCESS_PID])
 
-                entry.update({Resource.NAME : 'device_zombie',
-                              Resource.TYPE : 'device_zombie',
-                              Resource.PATH : 'device_zombie',
+                name = 'non-python' if psutil.pid_exists(missing_pid) else 'device_zombie'
+                entry.update({Resource.NAME : name,
+                              Resource.TYPE : name,
+                              Resource.PATH : name,
                               Resource.STATUS : 'sleeping'})
 
     # Make formatted visualization of tables
