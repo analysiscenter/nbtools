@@ -461,7 +461,8 @@ class ResourceInspector:
         self.warnings['missing_device_pids'] = set()
         for entry in table:
             if entry[Resource.DEVICE_PROCESS_PID] is not None and entry[Resource.HOST_PID] is None:
-                self.warnings['missing_device_pids'].add(entry[Resource.DEVICE_PROCESS_PID])
+                missing_pid = entry[Resource.DEVICE_PROCESS_PID]
+                self.warnings['missing_device_pids'].add(missing_pid)
 
                 name = 'non-python' if psutil.pid_exists(missing_pid) else 'device_zombie'
                 entry.update({Resource.NAME : name,
