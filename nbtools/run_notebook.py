@@ -3,6 +3,47 @@
 import os
 import time
 from glob import glob
+from textwrap import dedent
+
+# Code fragments that inserted in the notebook
+CELL_INSERT_COMMENT = "# Cell inserted during automated execution"
+
+# Connect with shelve database for inputs/outputs providing
+DB_CONNECT_CODE_CELL = """
+    import os, shelve
+    from dill import Pickler, Unpickler
+
+    shelve.Pickler = Pickler
+    shelve.Unpickler = Unpickler
+
+    out_path_db = {}
+"""
+DB_CONNECT_CODE_CELL = dedent(DB_CONNECT_CODE_CELL)
+
+# Insert params into the notebook
+INPUTS_CODE_CELL = """
+    # Inputs loading
+    with shelve.open(out_path_db) as notebook_db:
+        inputs = {**notebook_db}
+
+        locals().update(inputs)
+"""
+INPUTS_CODE_CELL = dedent(INPUTS_CODE_CELL)
+
+# Save notebook outputs
+OUTPUTS_CODE_CELL = """
+    # Output dict preparation
+    output = {{}}
+    outputs = {}
+
+    for value_name in outputs:
+        if value_name in locals():
+            output[value_name] = locals()[value_name]
+
+    with shelve.open(out_path_db) as notebook_db:
+        notebook_db['outputs'] = output
+"""
+OUTPUTS_CODE_CELL = dedent(OUTPUTS_CODE_CELL)
 
 
 def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None, execute_kwargs=None,
@@ -74,7 +115,6 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
     from nbconvert.preprocessors import ExecutePreprocessor
     import shelve
     from dill import Pickler, Unpickler
-    from textwrap import dedent
 
     if inputs or outputs:
         # Set `out_path_db` value
@@ -110,57 +150,22 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
     if hide_code_cells:
         notebook["metadata"].update({"hide_input": True})
 
-    if inputs or outputs:
-        # Code for work with the shelve database from the notebook
-        comment_header = "# Cell inserted during automated execution\n"
-        code_header = f"""\
-                       import os, shelve
-                       from dill import Pickler, Unpickler
-
-                       shelve.Pickler = Pickler
-                       shelve.Unpickler = Unpickler
-
-                       out_path_db = {repr(out_path_db)}"""
-
-        code_header = dedent(code_header)
-
     if inputs:
         # Save `inputs` in the shelve database and create a cell in the notebook
         # for parameters extraction
         with shelve.open(out_path_db) as notebook_db:
             notebook_db.update(inputs)
 
-        code = """\n
-                # Inputs loading
-                with shelve.open(out_path_db) as notebook_db:
-                    inputs = {**notebook_db}
-
-                    locals().update(inputs)"""
-
-        code = dedent(code)
-        code = comment_header + code_header + code
-
+        code = CELL_INSERT_COMMENT + DB_CONNECT_CODE_CELL.format(repr(out_path_db)) + INPUTS_CODE_CELL
         notebook['cells'].insert(inputs_pos, nbformat.v4.new_code_cell(code))
 
     if outputs:
         # Create a cell to extract outputs from the notebook
         # It saves locals from the notebook with preferred names in the shelve database
         # This cell will be executed in error case too
-        code = f"""\
-                # Output dict preparation
-                output = {{}}
-                outputs = {outputs}
-
-                for value_name in outputs:
-                    if value_name in locals():
-                        output[value_name] = locals()[value_name]
-
-                with shelve.open(out_path_db) as notebook_db:
-                    notebook_db['outputs'] = output"""
-
-        code = dedent(code)
-        code = comment_header + (code_header if not inputs else "") + code
-
+        code = CELL_INSERT_COMMENT + \
+               (DB_CONNECT_CODE_CELL.format(repr(out_path_db)) if not inputs else "") + \
+               OUTPUTS_CODE_CELL.format(outputs)
         output_cell = nbformat.v4.new_code_cell(code)
         notebook['cells'].append(output_cell)
 
@@ -182,46 +187,46 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
     finally:
         kernel_manager.shutdown_kernel()
 
-        # Check if something went wrong
-        failed, error_cell_num, traceback_message = extract_traceback(notebook=notebook)
+    # Check if something went wrong
+    failed, error_cell_num, traceback_message = extract_traceback(notebook=notebook)
 
-        if exec_failed:
-            failed = True
-            traceback_message += '\nNotebook execution failed\n'
+    if exec_failed:
+        failed = True
+        traceback_message += '\nNotebook execution failed\n'
 
-        # Prepare execution results: execution state, notebook outputs and error info (if exists)
-        if failed:
-            exec_res = {'failed': failed, 'failed cell number': error_cell_num, 'traceback': traceback_message}
-        else:
-            exec_res = {'failed': failed, 'failed cell number': None, 'traceback': ''}
+    # Prepare execution results: execution state, notebook outputs and error info (if exists)
+    if failed:
+        exec_res = {'failed': failed, 'failed cell number': error_cell_num, 'traceback': traceback_message}
+    else:
+        exec_res = {'failed': failed, 'failed cell number': None, 'traceback': ''}
 
-        if outputs is not None:
-            with shelve.open(out_path_db) as notebook_db:
-                exec_res['outputs'] = notebook_db.get('outputs', {})
+    if outputs is not None:
+        with shelve.open(out_path_db) as notebook_db:
+            exec_res['outputs'] = notebook_db.get('outputs', {})
 
-        if add_timestamp:
-            timestamp = (f"**Executed:** {time.ctime(start_time)}<br>"
-                         f"**Duration:** {time.strftime('%H:%M:%S', time.gmtime(time.time() - start_time))}<br>"
-                         f"**Autogenerated from:** [{path}]\n\n---")
-            timestamp_cell = nbformat.v4.new_markdown_cell(timestamp)
-            notebook['cells'].insert(0, timestamp_cell)
+    if add_timestamp:
+        timestamp = (f"**Executed:** {time.ctime(start_time)}<br>"
+                        f"**Duration:** {time.strftime('%H:%M:%S', time.gmtime(time.time() - start_time))}<br>"
+                        f"**Autogenerated from:** [{path}]\n\n---")
+        timestamp_cell = nbformat.v4.new_markdown_cell(timestamp)
+        notebook['cells'].insert(0, timestamp_cell)
 
-        # Save the executed notebook/HTML to disk
-        if out_path_ipynb:
-            save_notebook(notebook=notebook, out_path_ipynb=out_path_ipynb, display_link=display_links)
-        if out_path_html:
-            notebook_to_html(notebook=notebook, out_path_html=out_path_html, display_link=display_links)
+    # Save the executed notebook/HTML to disk
+    if out_path_ipynb:
+        save_notebook(notebook=notebook, out_path_ipynb=out_path_ipynb, display_link=display_links)
+    if out_path_html:
+        notebook_to_html(notebook=notebook, out_path_html=out_path_html, display_link=display_links)
 
-        # Remove shelve files if the notebook is successfully executed
-        if out_path_db and not failed:
-            db_paths = glob(out_path_db + '*')
+    # Remove shelve files if the notebook is successfully executed
+    if out_path_db and not failed:
+        db_paths = glob(out_path_db + '*')
 
-            for path_ in db_paths:
-                os.remove(path_)
+        for path_ in db_paths:
+            os.remove(path_)
 
-        if return_notebook:
-            exec_res['notebook'] = notebook
-        return exec_res
+    if return_notebook:
+        exec_res['notebook'] = notebook
+    return exec_res
 
 # Save notebook functions
 def save_notebook(notebook, out_path_ipynb, display_link):
