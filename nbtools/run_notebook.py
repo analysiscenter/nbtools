@@ -51,38 +51,53 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
                  raise_exception=False, return_notebook=False):
     """ Run a notebook and save the execution result.
 
-    Allows to pass `inputs` arguments, that are used as inputs for notebook execution. Under the hood,
-    we place all of them into a separate cell, inserted in the notebook; hence, all of the keys must be valid Python
-    names, and values should be valid for re-creating objects.
+    This function supports jupyter notebook execution from py scripts. It is an analog of `exec` built-in
+    <https://docs.python.org/3/library/functions.html#exec> for notebooks.
+
+    Moreover, it can save the execution result as ipynb and/or html file if needed.
+    Also, it allows to provide variables into notebook locals as inputs and can return some results as outputs.
+    The function can deal with internal notebook exceptions: it can raise an error (if `raise_exception` is True)
+    or continue further execution of additional instructions such as saving notebook execution files and/or outputs
+    and error info extraction.
+    By default, this function returns execution information and outputs, but you can get the executed notebook object if
+    `return_notebook` is True.
+
+    If you pass `inputs` arguments, then the function provides these variables into notebook locals in a separate code cell,
+    which is inserted in the notebook; hence, all of the keys must be valid Python names, and values should be valid for re-creating objects.
     Heavily inspired by https://github.com/tritemio/nbrun.
 
-    Also, allows to pass `outputs` parameter, which is a list of local variables that you need to return from
-    the executed notebook. Under the hood, we insert a cell that saves local variables with names from the `outputs`
-    in the shelve db. If the notebook failed, then the cell is executed directly. After that, we extract output
-    variables in this method and return them.
+    Also, you can pass `outputs` parameter, which is a list of local variables that you need to return from
+    the executed notebook. Under the hood, the function inserts a cell that saves local variables with preferable names
+    in the shelve db. If the notebook fails, then the cell will be executed directly. After that, we extract output
+    variables in this method and return them (if `raise_exception` is False).
+
+    Note that if you pass `inputs` or `outputs` arguments, than you need to provide one of `out_path_ipynb` or `out_path_db`.
+    Thats because inputs/outputs logic is based on a shelve database and we need to access it during this method execution.
+    Note that if an exception is raised by notebook execution, than the database is not cleared, so, you can access it
+    (don't forget to remove the database after the usage).
 
     Parameters
     ----------
     path : str
         Path to the notebook to execute.
     inputs : dict, optional
-        Inputs for notebook execution. Converted into a cell of variable assignments and inserted
+        Inputs for notebook execution. Converted into a cell of variables assignments and inserted
         into the notebook on `inputs_pos` place.
     outputs : str or iterable of str
-        List of notebook local variables that return to output.
+        List of notebook local variables to return.
     inputs_pos : int
         Position to insert the cell with inputs into the notebook.
     out_path_db : str, optional
         Path to save the shelve database files. There is no need in files extension.
-        If None and `inputs` or `outputs` are provided, than `out_path_db` is created from `out_path_ipynb`.
+        If None, then it is created from `out_path_ipynb`.
     execute_kwargs : dict, optional
-        Other parameters of `:class:ExecutePreprocessor`.
+        Parameters of `:class:ExecutePreprocessor`.
     out_path_ipynb : str, optional
-        Path to save the output .ipynb file.
+        Path to save the output ipynb file.
     out_path_html : str, optional
-        Path to save the output .html file.
+        Path to save the output html file.
     add_timestamp : bool
-        Whether to add a cell with execution information at the beginning of the executed notebook.
+        Whether to add a cell with execution information at the beginning of the saved notebook.
     hide_code_cells : bool
         Whether to hide the code cells in the executed notebook.
     display_links : bool
@@ -98,9 +113,9 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
         Dictionary with the notebook execution results.
         It provides next information:
         - 'failed' : bool
-           Whether the execution was failed.
+           Whether the notebook execution failed.
         - 'outputs' : dict
-          The notebook saved outputs.
+          The saved notebook variables.
         - 'failed cell number': int
           An error cell execution number (if exists).
         - 'traceback' : str
@@ -217,8 +232,8 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
     if out_path_html:
         notebook_to_html(notebook=notebook, out_path_html=out_path_html, display_link=display_links)
 
-    # Remove shelve files if the notebook is successfully executed
-    if out_path_db and not failed:
+    # Remove shelve files (all info is in `exec_res['outputs']`)
+    if out_path_db:
         db_paths = glob(out_path_db + '*')
 
         for path_ in db_paths:
@@ -241,7 +256,7 @@ def save_notebook(notebook, out_path_ipynb, display_link):
         display(FileLink(out_path_ipynb))
 
 def notebook_to_html(notebook, out_path_html, display_link):
-    """ Save notebook as ipynb file."""
+    """ Save notebook as html file."""
     from nbconvert import HTMLExporter
     from IPython.display import display, FileLink
 
