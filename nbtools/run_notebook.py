@@ -57,23 +57,24 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
 
     Additionally, it can save the execution result as ipynb and/or html file if needed.
     The function can deal with internal notebook exceptions: it can raise an error (if `raise_exception` is True)
-    or continue further execution of additional instructions such as saving notebook execution files or extraction of error
-    information and outputs values.
-    By default, this function returns execution information and outputs, but you can also get the executed notebook object if
-    `return_notebook` is True.
+    or continue further execution of additional instructions such as saving notebook execution files or extraction of
+    error information and outputs values.
+    By default, this function returns execution information and outputs, but you can also get the executed notebook
+    object if `return_notebook` is True.
 
-    If you pass the `inputs` argument, then the function provides these variables into notebook locals in a separate code cell,
-    which is inserted in the notebook; hence, all of the keys must be valid Python names, and values should be valid for
-    re-creating objects.
+    If you pass the `inputs` argument, then the function provides these variables into notebook locals in a separate
+    code cell, which is inserted in the notebook; hence, all of the keys must be valid Python names, and values should
+    be valid for re-creating objects.
     Heavily inspired by https://github.com/tritemio/nbrun.
 
     Moreover, you can pass the `outputs` parameter, which is a list of local variables that you need to return from
     the executed notebook. Under the hood, the function inserts a cell that saves local variables with preferable names
-    in a shelve database. If the notebook fails during execution, then the cell with outputs saving will be executed directly
-    (if `raise_exception` is False). After that, we extract output values in this function and return them.
+    in a shelve database. If the notebook fails during execution, then the cell with outputs saving will be executed
+    directly (if `raise_exception` is False). After that, we extract output values in this function and return them.
 
-    Note that if you pass `inputs` or `outputs` arguments, than you need to provide one of `out_path_ipynb` or `out_path_db`.
-    Thats because inputs/outputs logic is based on shelve databases and we need to access a database during this function execution.
+    Note that if you pass `inputs` or `outputs` arguments, than you need to provide one of `out_path_ipynb` or
+    `out_path_db`. Thats because inputs/outputs logic is based on shelve databases and we need to access a database
+    during this function execution.
 
     Parameters
     ----------
@@ -83,8 +84,8 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
         Inputs for notebook execution. Converted into a cell of variables assignments and inserted
         into the notebook on `inputs_pos` place.
     outputs : str or iterable of str, optional
-        List of notebook local variables to return. Converted into a code of variables saving and appended as additional cell 
-        at the end of the notebook.
+        List of notebook local variables to return. Converted into a code of variables saving and
+        appended as additional cell at the end of the notebook.
     inputs_pos : int, optional
         Position to insert the cell with inputs into the notebook.
     out_path_db : str, optional
