@@ -5,10 +5,10 @@ import time
 from glob import glob
 from textwrap import dedent
 
-# Code fragments that inserted in the notebook
+# Code fragments that are inserted in the notebook
 CELL_INSERT_COMMENT = "# Cell inserted during automated execution"
 
-# Connect with shelve database for inputs/outputs providing
+# Connect to a shelve database for inputs/outputs providing
 DB_CONNECT_CODE_CELL = """
     import os, shelve
     from dill import Pickler, Unpickler
@@ -20,7 +20,7 @@ DB_CONNECT_CODE_CELL = """
 """
 DB_CONNECT_CODE_CELL = dedent(DB_CONNECT_CODE_CELL)
 
-# Insert params into the notebook
+# Insert inputs into the notebook
 INPUTS_CODE_CELL = """
     # Inputs loading
     with shelve.open(out_path_db) as notebook_db:
@@ -49,32 +49,31 @@ OUTPUTS_CODE_CELL = dedent(OUTPUTS_CODE_CELL)
 def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None, execute_kwargs=None,
                  out_path_ipynb=None, out_path_html=None, add_timestamp=True, hide_code_cells=False, display_links=True,
                  raise_exception=False, return_notebook=False):
-    """ Run a notebook and save the execution result.
+    """ Execute a jupyter notebook.
 
     This function supports jupyter notebook execution from py scripts. It is an analog of `exec` built-in
     <https://docs.python.org/3/library/functions.html#exec> for notebooks.
+    The `run_notebook` allows to provide and extract variables into/from notebook locals with `inputs` and `outputs`.
 
-    Moreover, it can save the execution result as ipynb and/or html file if needed.
-    Also, it allows to provide variables into notebook locals as inputs and can return some results as outputs.
+    Additionally, it can save the execution result as ipynb and/or html file if needed.
     The function can deal with internal notebook exceptions: it can raise an error (if `raise_exception` is True)
-    or continue further execution of additional instructions such as saving notebook execution files and/or outputs
-    and error info extraction.
-    By default, this function returns execution information and outputs, but you can get the executed notebook object if
+    or continue further execution of additional instructions such as saving notebook execution files or extraction of error
+    information and outputs values.
+    By default, this function returns execution information and outputs, but you can also get the executed notebook object if
     `return_notebook` is True.
 
-    If you pass `inputs` arguments, then the function provides these variables into notebook locals in a separate code cell,
-    which is inserted in the notebook; hence, all of the keys must be valid Python names, and values should be valid for re-creating objects.
+    If you pass the `inputs` argument, then the function provides these variables into notebook locals in a separate code cell,
+    which is inserted in the notebook; hence, all of the keys must be valid Python names, and values should be valid for
+    re-creating objects.
     Heavily inspired by https://github.com/tritemio/nbrun.
 
-    Also, you can pass `outputs` parameter, which is a list of local variables that you need to return from
+    Moreover, you can pass the `outputs` parameter, which is a list of local variables that you need to return from
     the executed notebook. Under the hood, the function inserts a cell that saves local variables with preferable names
-    in the shelve db. If the notebook fails, then the cell will be executed directly. After that, we extract output
-    variables in this method and return them (if `raise_exception` is False).
+    in a shelve database. If the notebook fails during execution, then the cell with outputs saving will be executed directly
+    (if `raise_exception` is False). After that, we extract output values in this function and return them.
 
     Note that if you pass `inputs` or `outputs` arguments, than you need to provide one of `out_path_ipynb` or `out_path_db`.
-    Thats because inputs/outputs logic is based on a shelve database and we need to access it during this method execution.
-    Note that if an exception is raised by notebook execution, than the database is not cleared, so, you can access it
-    (don't forget to remove the database after the usage).
+    Thats because inputs/outputs logic is based on shelve databases and we need to access a database during this function execution.
 
     Parameters
     ----------
@@ -83,12 +82,13 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
     inputs : dict, optional
         Inputs for notebook execution. Converted into a cell of variables assignments and inserted
         into the notebook on `inputs_pos` place.
-    outputs : str or iterable of str
-        List of notebook local variables to return.
-    inputs_pos : int
+    outputs : str or iterable of str, optional
+        List of notebook local variables to return. Converted into a code of variables saving and appended as additional cell 
+        at the end of the notebook.
+    inputs_pos : int, optional
         Position to insert the cell with inputs into the notebook.
     out_path_db : str, optional
-        Path to save the shelve database files. There is no need in files extension.
+        Path to save shelve database files. There is no need in files extension.
         If None, then it is created from `out_path_ipynb`.
     execute_kwargs : dict, optional
         Parameters of `:class:ExecutePreprocessor`.
@@ -96,15 +96,15 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
         Path to save the output ipynb file.
     out_path_html : str, optional
         Path to save the output html file.
-    add_timestamp : bool
+    add_timestamp : bool, optional
         Whether to add a cell with execution information at the beginning of the saved notebook.
-    hide_code_cells : bool
+    hide_code_cells : bool, optional
         Whether to hide the code cells in the executed notebook.
-    display_links : bool
+    display_links : bool, optional
         Whether to display links to the executed notebook and html at execution.
-    raise_exception : bool
+    raise_exception : bool, optional
         Whether to re-raise exceptions from the notebook.
-    return_notebook : bool
+    return_notebook : bool, optional
         Whether to return the notebook object from this function.
 
     Returns
@@ -115,14 +115,15 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
         - 'failed' : bool
            Whether the notebook execution failed.
         - 'outputs' : dict
-          The saved notebook variables.
+           Saved notebook local variables.
+           Is not presented in `exec_res` dict, if `outputs` argument is None.
         - 'failed cell number': int
-          An error cell execution number (if exists).
+           An error cell execution number (if notebook failed).
         - 'traceback' : str
-          Traceback message from the notebook (if exists).
-        - 'notebook' : :class:`nbformat.notebooknode.NotebookNode`
-          Executed notebook object.
-          Note that this output is provided only if `return_notebook` is True.
+           Traceback message from the notebook (if notebook failed).
+        - 'notebook' : :class:`nbformat.notebooknode.NotebookNode`, optional
+           Executed notebook object.
+           Note that this output is provided only if `return_notebook` is True.
     """
     # pylint: disable=bare-except, lost-exception
     import nbformat
@@ -143,7 +144,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
                 error_message = dedent(error_message)
                 raise ValueError(error_message)
 
-        # (Re)create a shelve database
+        # Create a shelve database
         shelve.Pickler = Pickler
         shelve.Unpickler = Unpickler
 
@@ -194,13 +195,24 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
 
         # Save notebook outputs in the shelve db
         if outputs is not None:
-            executor.kc = kernel_manager.client() # For compatibility with 5.x.x version
+            executor.kc = kernel_manager.client() # For compatibility with 5.x.x version of `nbconvert`
             executor.preprocess_cell(output_cell, {'metadata': {'path': working_dir}}, -1)
 
         if raise_exception:
             raise
     finally:
         kernel_manager.shutdown_kernel()
+
+        # Extract information from the database and remove it (if exists)
+        if outputs is not None:
+            with shelve.open(out_path_db) as notebook_db:
+                outputs_values = notebook_db.get('outputs', {})
+
+        if out_path_db:
+            db_paths = glob(out_path_db + '*')
+
+            for path_ in db_paths:
+                os.remove(path_)
 
     # Check if something went wrong
     failed, error_cell_num, traceback_message = extract_traceback(notebook=notebook)
@@ -216,8 +228,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
         exec_res = {'failed': failed, 'failed cell number': None, 'traceback': ''}
 
     if outputs is not None:
-        with shelve.open(out_path_db) as notebook_db:
-            exec_res['outputs'] = notebook_db.get('outputs', {})
+        exec_res['outputs'] = outputs_values
 
     if add_timestamp:
         timestamp = (f"**Executed:** {time.ctime(start_time)}<br>"
@@ -231,13 +242,6 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
         save_notebook(notebook=notebook, out_path_ipynb=out_path_ipynb, display_link=display_links)
     if out_path_html:
         notebook_to_html(notebook=notebook, out_path_html=out_path_html, display_link=display_links)
-
-    # Remove shelve files (all info is in `exec_res['outputs']`)
-    if out_path_db:
-        db_paths = glob(out_path_db + '*')
-
-        for path_ in db_paths:
-            os.remove(path_)
 
     if return_notebook:
         exec_res['notebook'] = notebook
