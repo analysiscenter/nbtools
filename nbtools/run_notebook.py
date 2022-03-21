@@ -51,12 +51,12 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
                  raise_exception=False, return_notebook=False):
     """ Execute a jupyter notebook.
 
-    This function supports jupyter notebook execution from py scripts. It is an analog of `exec` built-in
-    <https://docs.python.org/3/library/functions.html#exec> for notebooks.
-    The `run_notebook` allows to provide and extract variables into/from notebook locals with `inputs` and `outputs`.
+    This function supports jupyter notebooks execution from py scripts. It is an analog of the `exec` built-in
+    <https://docs.python.org/3/library/functions.html#exec> for notebooks. Moreover, the `run_notebook` allows to
+    provide and extract variables into/from notebook locals with `inputs` and `outputs` arguments.
 
-    Additionally, it can save the execution result as ipynb and/or html file if needed.
-    The function can deal with internal notebook exceptions: it can raise an error (if `raise_exception` is True)
+    Additionally, this function can save the execution result as an ipynb and/or html file if needed.
+    The `run_notebook` can deal with internal notebook exceptions: it can raise an error (if `raise_exception` is True)
     or continue further execution of additional instructions such as saving notebook execution files or extraction of
     error information and outputs values.
     By default, this function returns execution information and outputs, but you can also get the executed notebook
@@ -67,13 +67,13 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
     be valid for re-creating objects.
     Heavily inspired by https://github.com/tritemio/nbrun.
 
-    Moreover, you can pass the `outputs` parameter, which is a list of local variables that you need to return from
+    Also, you can pass the `outputs` parameter, which is a list of local variables that you need to return from
     the executed notebook. Under the hood, the function inserts a cell that saves local variables with preferable names
     in a shelve database. If the notebook fails during execution, then the cell with outputs saving will be executed
-    directly (if `raise_exception` is False). After that, we extract output values in this function and return them.
+    directly (if `raise_exception` is False). After that, we extract output values and return them.
 
     Note that if you pass `inputs` or `outputs` arguments, than you need to provide one of `out_path_ipynb` or
-    `out_path_db`. Thats because inputs/outputs logic is based on shelve databases and we need to access a database
+    `out_path_db`. That's because inputs/outputs logic is based on shelve databases and we need to access a database
     during this function execution.
 
     Parameters
