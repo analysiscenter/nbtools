@@ -35,7 +35,8 @@ def generate_pylintrc(path, disable=(), enable=(), max_line_length=120, **pylint
     disable : sequence
         Which checks to disable. Each element should be either a code or a name of the check.
     enable : sequence
-        Which checks to enable. Each element should be either a code or a name of the check. Has priority over `disable`.
+        Which checks to enable. Each element should be either a code or a name of the check.
+        Has priority over `disable`.
     max_line_length : int
         Allowed line length.
     pylint_params : dict

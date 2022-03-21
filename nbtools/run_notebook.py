@@ -59,7 +59,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, out_path_db=None
     Flag `raise_exception` defines behavior if the execution of the notebook is failed due to an exception.
 
     Under the hood, this function does the following:
-        - Create an internal shelve database to communicate variables (both `inputs` and `outputs`). Save `inputs` to it.
+        - Create an internal database to communicate variables (both `inputs` and `outputs`). Save `inputs` to it.
         - Add a cell with reading `inputs` from the database, add a cell for saving `outputs` to the database.
         - Execute notebook.
         - Handle exceptions.
