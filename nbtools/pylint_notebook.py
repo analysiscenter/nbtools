@@ -1,4 +1,4 @@
-""" !!. """
+""" Functions for code quality control of Jupyter Notebooks. """
 #pylint: disable=import-outside-toplevel
 import os
 
@@ -26,7 +26,22 @@ additional-builtins=display, get_ipython
 
 
 def generate_pylintrc(path, disable=(), enable=(), max_line_length=120, **pylint_params):
-    """ !!. """
+    """ Create `pylintrc` file.
+
+    Parameters
+    ----------
+    path : str
+        Path to save the file.
+    disable : sequence
+        Which checks to disable. Each element should be either a code or a name of the check.
+    enable : sequence
+        Which checks to enable. Each element should be either a code or a name of the check.
+        Has priority over `disable`.
+    max_line_length : int
+        Allowed line length.
+    pylint_params : dict
+        Additional parameter of linting. Each is converted to a separate valid entry in the `pylintrc` file.
+    """
     disable = [disable] if isinstance(disable, str) else disable
     enable = [enable] if isinstance(enable, str) else enable
     disable = [item.replace('_', '-') for item in disable]
@@ -55,7 +70,37 @@ def generate_pylintrc(path, disable=(), enable=(), max_line_length=120, **pylint
 
 def pylint_notebook(path=None, options=(), disable=(), enable=(), printer=print,
                     remove_files=True, return_info=False, **pylint_params):
-    """ !!. """
+    """ Execute `pylint` for a provided Jupyter Notebook.
+
+    Under the hood, roughly does the following:
+        - Creates a `.pylintrc` file next to the `path`.
+        - Converts the notebook to `.py` file next to the `path`.
+        - Runs `pylint` with additional options.
+        - Create a report and display it, if needed.
+
+    Parameters
+    ----------
+    path : str, optional
+        Path to the Jupyter notebook. If not provided, the current notebook is used.
+    options : sequence
+        Additional options for `pylint` execution.
+    printer : callable or None
+        Function to display the report.
+    remove_files : bool
+        Whether to remove `.pylintrc` and `.py` files after the execution.
+    return_info : bool
+        Whether to return a dictionary with intermediate results.
+        It contains the notebook code string, as well as `pylint` stdout and stderr.
+    disable : sequence
+        Which checks to disable. Each element should be either a code or a name of the check.
+    enable : sequence
+        Which checks to enable. Each element should be either a code or a name of the check.
+        Has priority over `disable`.
+    max_line_length : int
+        Allowed line length.
+    pylint_params : dict
+        Additional parameter of linting. Each is converted to a separate valid entry in the `pylintrc` file.
+    """
     from pylint import epylint as lint
     path = path or get_notebook_path()
     if path is None:
