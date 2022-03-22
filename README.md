@@ -58,6 +58,17 @@ pylint_notebook(path_to_ipynb,             # If not provided, use path to the cu
 
 Under the hood, it converts `.ipynb` notebook to `.py` script, creates a custom `.pylintrc` configuration, runs the `pylint` and removes all temporary files. Learn more about its usage in the [tutorial.](tutorials/NBstat.ipynb)
 
+## **run_notebook**
+Provides a `eval`-like interface for running Jupyter Notebooks programmatically. We use it for running interactive tests, that are easy to work with: in case of any failures, one can jump right into fixing it with an already set-up environment.
+
+```python
+from nbtools import run_notebook
+run_notebook(path_to_ipynb,                       # Which notebook to run
+             out_path_ipynb,                      # Where to save result
+             inputs={'learning_rate': 0.05,},     # Pass variables to notebook
+             outputs=['accuracy'])                # Extract variables from notebook
+```
+
 
 ## **set_gpus**
 Select free device(s) and set `CUDA_VISIBLE_DEVICES` environment variable so that the current process sees only them.
