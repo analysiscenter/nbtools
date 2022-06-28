@@ -47,8 +47,8 @@ OUTPUTS_CODE_CELL = dedent(OUTPUTS_CODE_CELL)
 
 
 def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = './', execute_kwargs=None,
-                 out_path_db=None, out_path_ipynb=None, out_path_html=None, add_timestamp=True, hide_code_cells=False,
-                 display_links=True, raise_exception=False, return_notebook=False):
+                 out_path_db=None, out_path_ipynb=None, out_path_html=None, remove_db='always', add_timestamp=True,
+                 hide_code_cells=False, display_links=True, raise_exception=False, return_notebook=False):
     """ Execute a Jupyter Notebook programmatically.
     Heavily inspired by https://github.com/tritemio/nbrun.
 
@@ -95,6 +95,15 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
         Path to save the output ipynb file.
     out_path_html : str, optional
         Path to save the output html file.
+    remove_db : str, optional
+        Whether to remove shelve database after notebook execution.
+        Possible options are: 'always', 'not_failed_case' or 'never'.
+        If 'always', then remove the database after notebook execution.
+        If 'not_failed_case', then remove the database if there wasn't any execution failure.
+        If 'never', then don't remove the database after notebook execution.
+        Running `:meth:run_notebook` with 'not_failed_case' or 'never' option helps to reproduce failures
+        in the `out_path_ipynb` notebook: it will take passed inputs from the saved shelve database.
+        Note, that database exists only if inputs and/or outputs are provided.
     execute_kwargs : dict, optional
         Parameters of `:class:ExecutePreprocessor`.
     add_timestamp : bool, optional
@@ -208,18 +217,19 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
             with shelve.open(out_path_db) as notebook_db:
                 outputs_values = notebook_db.get('outputs', {})
 
-        if out_path_db is not None:
-            db_paths = glob(out_path_db + '*')
-
-            for path_ in db_paths:
-                os.remove(path_)
-
         # Check if something went wrong
         failed, error_cell_num, traceback_message = extract_traceback(notebook=notebook)
 
         if exec_failed:
             failed = True
             traceback_message += '\nNotebook execution failed\n'
+
+        # Remove database
+        if out_path_db is not None and (remove_db == 'always' or (remove_db == 'not_failed_case' and not failed)):
+            db_paths = glob(out_path_db + '*')
+
+            for path_ in db_paths:
+                os.remove(path_)
 
         # Prepare execution results: execution state, notebook outputs and error info (if exists)
         if failed:
