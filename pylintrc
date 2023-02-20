@@ -14,7 +14,7 @@ variable-rgx=(.*[a-z][a-z0-9_]{1,30}|[a-z_])$ # snake_case + single letters
 argument-rgx=(.*[a-z][a-z0-9_]{1,30}|[a-z_])$ # snake_case + single letters
 
 [MESSAGE CONTROL]
-disable=import-error, relative-beyond-top-level, attribute-defined-outside-init, no-self-use
+disable=import-error, relative-beyond-top-level, attribute-defined-outside-init, unnecessary-lambda-assignment
 
 [TYPECHECK]
 ignored-modules=numpy, numba

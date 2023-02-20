@@ -146,7 +146,7 @@ class ResourceInspector:
 
         TODO: once VSCode has stable standard and doc for ipykernel launches, add its parsing here.
         """
-        #pylint: disable=import-outside-toplevel
+        #pylint: disable=import-outside-toplevel, missing-timeout
         servers = []
         try:
             from notebook.notebookapp import list_running_servers as list_running_servers_v2
