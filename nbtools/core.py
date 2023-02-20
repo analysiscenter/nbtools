@@ -210,6 +210,7 @@ def set_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False, raise_err
     raise_error : bool
         Whether to raise an exception if not enough devices are available.
     """
+    #pylint: disable=consider-iterating-dictionary
     if 'CUDA_VISIBLE_DEVICES' in os.environ.keys():
         str_devices = os.environ["CUDA_VISIBLE_DEVICES"]
         warnings.warn(f'`CUDA_VISIBLE_DEVICES` is already set to "{str_devices}"!')
