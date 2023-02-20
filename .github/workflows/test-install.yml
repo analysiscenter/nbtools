@@ -61,7 +61,7 @@ jobs:
       run: |
         pip install --user -U pip
         pip install wheel
-        pip install --user git+https://github.com/${{ github.event.pull_request.head.repo.full_name }}.git@${{ github.head_ref }}#egg=nbtools
+        pip install --user git+https://github.com/${{ github.event.pull_request.head.repo.full_name }}.git@${{ github.head_ref }}#egg=py-nbtools
 
     - name: Run 'import nbtools'
       run: python -c 'import nbtools'
