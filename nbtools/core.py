@@ -222,5 +222,6 @@ def set_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False, raise_err
     os.environ['CUDA_VISIBLE_DEVICES'] = str_devices
 
     newline = "\n" if verbose==2 else ""
-    print(f'{newline}`CUDA_VISIBLE_DEVICES` set to "{str_devices}"')
+    if verbose:
+        print(f'{newline}`CUDA_VISIBLE_DEVICES` set to "{str_devices}"')
     return devices
