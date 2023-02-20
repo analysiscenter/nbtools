@@ -32,6 +32,7 @@ def get_notebook_path():
 
     If run outside Jupyter notebook, returns None.
     """
+    #pylint: disable=missing-timeout
     if not in_notebook():
         return None
 

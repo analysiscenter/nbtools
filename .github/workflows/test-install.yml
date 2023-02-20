@@ -1,0 +1,67 @@
+name: Test installation
+
+on:
+  pull_request:
+    branches:
+    - master
+
+jobs:
+
+# -----------------------------------------
+#    Use a module from local source
+# -----------------------------------------
+  use_as_local_module:
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: [3.8, 3.9]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Python ${{ matrix.python-version }} on ${{ matrix.os }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install requirements
+      run: |
+        pip install --user -U pip
+        pip install --user -r requirements.txt
+
+    - name: Run 'import nbtools'
+      run: python -c 'import nbtools'
+
+
+
+# -----------------------------------------
+#    Install with pip
+# -----------------------------------------
+  install_with_pip:
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: [3.8, 3.9]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Set up Python ${{ matrix.python-version }} on ${{ matrix.os }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install with pip
+      run: |
+        pip install --user -U pip
+        pip install wheel
+        pip install --user git+https://github.com/${{ github.event.pull_request.head.repo.full_name }}.git@${{ github.head_ref }}#egg=py-nbtools
+
+    - name: Run 'import nbtools'
+      run: python -c 'import nbtools'
