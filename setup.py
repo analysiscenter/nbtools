@@ -34,7 +34,7 @@ setup(
     extras_require={'nbrun': [
         'ipython>=7.10.0',
         'nbconvert>=5.6.1',
-    ]}
+    ]},
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
