@@ -53,7 +53,7 @@ OUTPUTS_CODE_CELL = dedent(OUTPUTS_CODE_CELL)
 
 def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = './', execute_kwargs=None,
                  out_path_db=None, out_path_ipynb=None, out_path_html=None, remove_db='always', add_timestamp=True,
-                 hide_code_cells=False, mask_extra_code=True, display_links=True,
+                 hide_code_cells=False, mask_extra_code=False, display_links=True,
                  raise_exception=False, return_notebook=False):
     """ Execute a Jupyter Notebook programmatically.
     Heavily inspired by https://github.com/tritemio/nbrun.
