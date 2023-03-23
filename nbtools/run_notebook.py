@@ -28,10 +28,17 @@ INPUTS_CODE_CELL = """
 
         locals().update(inputs)
 """
-YAML_IMPORT = """import yaml"""
-INPUTS_DISPLAY = """print(yaml.dump(inputs))"""
-
 INPUTS_CODE_CELL = dedent(INPUTS_CODE_CELL)
+
+INPUTS_DISPLAY = """
+    for k, v in inputs.items():
+        if isinstance(v, str):
+            print(f"{k} = '{v}'")
+        else:
+            print(f"{k} = {v}")
+""" # it is better than pprint, because pprint adds quotes on variable names
+# TODO: think about indentation for dicts and lists
+INPUTS_DISPLAY = dedent(INPUTS_DISPLAY)
 
 # Save notebook outputs
 OUTPUTS_CODE_CELL = """
@@ -46,9 +53,17 @@ OUTPUTS_CODE_CELL = """
     with shelve.open(out_path_db) as notebook_db:
         notebook_db['outputs'] = output
 """
-OUTPUTS_DISPLAY = """print(yaml.dump(output))"""
-
 OUTPUTS_CODE_CELL = dedent(OUTPUTS_CODE_CELL)
+
+OUTPUTS_DISPLAY = """
+    for k, v in output.items():
+        if isinstance(v, str):
+            print(f"{k} = '{v}'")
+        else:
+            print(f"{k} = {v}")
+"""
+OUTPUTS_DISPLAY = dedent(OUTPUTS_DISPLAY)
+
 
 
 def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = './', execute_kwargs=None,
@@ -192,7 +207,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
 
         code = CELL_INSERT_COMMENT + DB_CONNECT_CODE_CELL.format(repr(out_path_db)) + INPUTS_CODE_CELL
         if mask_extra_code:
-            code += YAML_IMPORT + '\n' + INPUTS_DISPLAY
+            code += INPUTS_DISPLAY
 
         notebook['cells'].insert(inputs_pos, nbformat.v4.new_code_cell(code))
 
@@ -205,8 +220,6 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
                OUTPUTS_CODE_CELL.format(outputs)
 
         if mask_extra_code:
-            if inputs is None:
-                code = YAML_IMPORT + '\n' + code
             code += OUTPUTS_DISPLAY
 
         output_cell = nbformat.v4.new_code_cell(code)
@@ -300,9 +313,7 @@ def mask_inputs_reading(notebook, pos):
 
     execution_count = notebook['cells'][pos]['execution_count']
 
-    code_mask = str(notebook['cells'][pos]['outputs'][0]['text']).split('\n')
-    code_mask = [variable.replace(':', ' =', 1) for variable in code_mask]
-    code_mask = '\n'.join(code_mask)[:-2]
+    code_mask = str(notebook['cells'][pos]['outputs'][0]['text'])[:-1]
 
     cell_mask = nbformat.v4.new_code_cell(source=code_mask, execution_count=execution_count)
     notebook['cells'][pos] = cell_mask
@@ -326,7 +337,7 @@ def mask_outputs_dumping(notebook, pos):
     text_mask = ''
 
     for variable in outputs_variables:
-        separator_pos = int(variable.find(':'))
+        separator_pos = int(variable.find(' = '))
 
         if separator_pos != -1:
             variable_name = variable[:separator_pos]
@@ -335,7 +346,6 @@ def mask_outputs_dumping(notebook, pos):
             code_mask += f'print({variable_name})\n'
             text_mask += variable_value
 
-    code_mask = code_mask[:-1]
     outputs_mask =  [nbformat.v4.new_output(text=text_mask, name='stdout', output_type='stream')]
 
     cell_mask = nbformat.v4.new_code_cell(source=code_mask, execution_count=execution_count, outputs=outputs_mask)
