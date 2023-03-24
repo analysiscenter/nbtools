@@ -3,9 +3,9 @@
 import os
 import time
 from glob import glob
-import psutil
 import re
 from textwrap import dedent
+import psutil
 
 
 
@@ -198,7 +198,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
 
     # Notebook preparation:
     # Read the notebook, insert a cell with inputs, insert another cell for outputs extraction
-    with open(path) as file:
+    with open(path, encoding='utf-8') as file:
         notebook = nbformat.read(file, as_version=4)
 
     if hide_code_cells:
