@@ -3,7 +3,11 @@
 import os
 import time
 from glob import glob
+import psutil
+import re
 from textwrap import dedent
+
+
 
 # Code fragments that are inserted in the notebook
 CELL_INSERT_COMMENT = "# Cell inserted during automated execution"
@@ -194,7 +198,8 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
 
     # Notebook preparation:
     # Read the notebook, insert a cell with inputs, insert another cell for outputs extraction
-    notebook = nbformat.read(path, as_version=4)
+    with open(path) as file:
+        notebook = nbformat.read(file, as_version=4)
 
     if hide_code_cells:
         notebook["metadata"].update({"hide_input": True})
@@ -241,7 +246,15 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
         if raise_exception:
             raise
     finally:
-        kernel_manager.shutdown_kernel()
+        # Shutdown kernel and kill process
+        kernel_manager.cleanup_resources()
+        kernel_manager.shutdown_kernel(now=True)
+
+        pid = get_proc_info(kernel_manager.kernel_id)
+
+        if pid is not None and psutil.pid_exists(pid):
+            process = psutil.Process(pid)
+            process.terminate()
 
         # Extract information from the database and remove it (if exists)
         if outputs is not None:
@@ -409,3 +422,21 @@ def extract_traceback(notebook):
                 return True, cell['execution_count'], traceback
 
     return False, None, ""
+
+def get_proc_info(kernel_id):
+    """ Get pid (if exists) by kernel_id. """
+    pids = psutil.pids()
+
+    for pid in pids:
+        try:
+            proc = psutil.Process(pid)
+            cmd = " ".join(proc.cmdline())
+        except psutil.NoSuchProcess:
+            continue
+
+        if len(cmd) > 0 and ("jupyter" in cmd or "ipython" in cmd) and "kernel" in cmd:
+            current_kernel_id = re.sub(re.compile(r".+kernel-(.+)\.json"), r"\1", cmd)
+            if current_kernel_id == kernel_id:
+                return pid
+
+    return None
