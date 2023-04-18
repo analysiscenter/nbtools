@@ -76,8 +76,10 @@ class ResourceInspector:
         device_table, device_process_table = ResourceTable(), ResourceTable()
 
         for device_id, handle in self.device_handles.items():
+            device_name = nvidia_smi.nvmlDeviceGetName(handle)
+            device_name = device_name.decode() if isinstance(device_name, bytes) else device_name
             common_info = {Resource.DEVICE_ID : device_id,
-                           Resource.DEVICE_NAME : nvidia_smi.nvmlDeviceGetName(handle).decode()}
+                           Resource.DEVICE_NAME : device_name}
 
             # Inseparable device information like memory, temperature, power, etc. Request it only if needed
             if (formatter.get(Resource.DEVICE_UTIL, False) or
@@ -566,8 +568,14 @@ class ResourceInspector:
         """ Add a supheader with info about current time, driver and CUDA versions. """
         timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
         interval_info = f'Interval: {interval:2.1f}s' if interval is not None else ''
-        driver_version = '.'.join(nvidia_smi.nvmlSystemGetDriverVersion().decode().split('.')[:-1])
-        cuda_version = nvidia_smi.nvmlSystemGetNVMLVersion().decode()[:4]
+
+        driver_version = nvidia_smi.nvmlSystemGetDriverVersion()
+        driver_version = driver_version.decode() if isinstance(driver_version, bytes) else driver_version
+        driver_version = '.'.join(driver_version.split('.')[:-1])
+
+        cuda_version = nvidia_smi.nvmlSystemGetNVMLVersion()
+        cuda_version = cuda_version.decode() if isinstance(cuda_version, bytes) else cuda_version
+        cuda_version = cuda_version[:4]
 
         parts = [
             timestamp,
