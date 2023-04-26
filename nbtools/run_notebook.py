@@ -182,6 +182,9 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
                 error_message = dedent(error_message)
                 raise ValueError(error_message)
 
+        # `out_path_db` is db path for current method, for db reading from the executed notebook we need relative path:
+        working_dir_out_path_db = os.path.relpath(out_path_db, start=working_dir)
+
         # Create a shelve database
         shelve.Pickler = Pickler
         shelve.Unpickler = Unpickler
@@ -192,7 +195,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
     if isinstance(outputs, str):
         outputs = [outputs]
 
-    execute_kwargs = execute_kwargs or {'timeout': -1}
+    execute_kwargs = {'timeout': -1} if execute_kwargs is None else {'timeout': -1, **execute_kwargs}
     executor = ExecutePreprocessor(**execute_kwargs)
     kernel_manager = KernelManager()
 
@@ -210,7 +213,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
         with shelve.open(out_path_db) as notebook_db:
             notebook_db.update(inputs)
 
-        code = CELL_INSERT_COMMENT + DB_CONNECT_CODE_CELL.format(repr(out_path_db)) + INPUTS_CODE_CELL
+        code = CELL_INSERT_COMMENT + DB_CONNECT_CODE_CELL.format(repr(working_dir_out_path_db)) + INPUTS_CODE_CELL
         if mask_extra_code:
             code += INPUTS_DISPLAY
 
@@ -221,7 +224,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
         # It saves locals from the notebook with preferred names in the shelve database
         # This cell will be executed in error case too
         code = CELL_INSERT_COMMENT + \
-               (DB_CONNECT_CODE_CELL.format(repr(out_path_db)) if not inputs else "") + \
+               (DB_CONNECT_CODE_CELL.format(repr(working_dir_out_path_db)) if not inputs else "") + \
                OUTPUTS_CODE_CELL.format(outputs)
 
         if mask_extra_code:
