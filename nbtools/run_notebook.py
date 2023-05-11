@@ -2,13 +2,43 @@
 #pylint: disable=import-outside-toplevel
 import os
 import time
+from functools import wraps
 from glob import glob
-import re
 from textwrap import dedent
 import psutil
+import time
+from multiprocessing import Process, Queue
 
 
 
+# Decorator
+def run_in_process(func):
+    """ Decorator to run the `func` in a separated process for terminating all relevant processes properly. """
+    @wraps(func)
+    def _wrapper(*args, **kwargs):
+        returned_value = Queue()
+        kwargs = {**kwargs, 'returned_value': returned_value}
+
+        try:
+            process = Process(target=func, args=args, kwargs=kwargs)
+
+            process.start()
+            process.join()
+
+        except:
+            # Terminate all relevant processes when something went wrong, e.g. Keyboard Interrupt
+            for child in psutil.Process(process.pid).children():
+                if psutil.pid_exists(child.pid):
+                    child.terminate()
+
+            if psutil.pid_exists(process.pid):
+                process.terminate()
+
+        return returned_value.get()
+    return _wrapper
+
+
+# Code cells for insertion
 # Code fragments that are inserted in the notebook
 CELL_INSERT_COMMENT = "# Cell inserted during automated execution"
 
@@ -70,10 +100,12 @@ OUTPUTS_DISPLAY = dedent(OUTPUTS_DISPLAY)
 
 
 
+# Main functions
+@run_in_process
 def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = './', execute_kwargs=None,
                  out_path_db=None, out_path_ipynb=None, out_path_html=None, remove_db='always', add_timestamp=True,
                  hide_code_cells=False, mask_extra_code=False, display_links=True,
-                 raise_exception=False, return_notebook=False):
+                 raise_exception=False, return_notebook=False, returned_value=None):
     """ Execute a Jupyter Notebook programmatically.
     Heavily inspired by https://github.com/tritemio/nbrun.
 
@@ -144,6 +176,8 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
         Whether to re-raise exceptions from the notebook.
     return_notebook : bool, optional
         Whether to return the notebook object from this function.
+    returned_value : None
+        Placeholder for the :func:`~.run_in_process` decorator to return this function result.
 
     Returns
     -------
@@ -249,15 +283,9 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
         if raise_exception:
             raise
     finally:
-        # Shutdown kernel and kill process
+        # Shutdown kernel
         kernel_manager.cleanup_resources()
         kernel_manager.shutdown_kernel(now=True)
-
-        pid = get_proc_info(kernel_manager.kernel_id)
-
-        if pid is not None and psutil.pid_exists(pid):
-            process = psutil.Process(pid)
-            process.terminate()
 
         # Extract information from the database and remove it (if exists)
         if outputs is not None:
@@ -312,7 +340,8 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
 
         if return_notebook:
             exec_res['notebook'] = notebook
-        return exec_res
+
+        returned_value.put(exec_res) # return for parent process
 
 # Mask functions for database operations cells
 def mask_inputs_reading(notebook, pos):
@@ -395,6 +424,7 @@ def notebook_to_html(notebook, out_path_html, display_link):
         display(FileLink(out_path_html))
 
 
+# Traceback postprocessing
 def extract_traceback(notebook):
     """ Extracts information about an error from the notebook.
 
@@ -425,21 +455,3 @@ def extract_traceback(notebook):
                 return True, cell['execution_count'], traceback
 
     return False, None, ""
-
-def get_proc_info(kernel_id):
-    """ Get pid (if exists) by kernel_id. """
-    pids = psutil.pids()
-
-    for pid in pids:
-        try:
-            proc = psutil.Process(pid)
-            cmd = " ".join(proc.cmdline())
-        except psutil.NoSuchProcess:
-            continue
-
-        if len(cmd) > 0 and ("jupyter" in cmd or "ipython" in cmd) and "kernel" in cmd:
-            current_kernel_id = re.sub(re.compile(r".+kernel-(.+)\.json"), r"\1", cmd)
-            if current_kernel_id == kernel_id:
-                return pid
-
-    return None
