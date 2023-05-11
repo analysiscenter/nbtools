@@ -5,9 +5,8 @@ import time
 from functools import wraps
 from glob import glob
 from textwrap import dedent
-import psutil
-import time
 from multiprocessing import Process, Queue
+import psutil
 
 
 
@@ -26,6 +25,7 @@ def run_in_process(func):
             process.join()
 
         except:
+            # pylint: disable=bare-except
             # Terminate all relevant processes when something went wrong, e.g. Keyboard Interrupt
             for child in psutil.Process(process.pid).children():
                 if psutil.pid_exists(child.pid):
@@ -102,7 +102,8 @@ OUTPUTS_DISPLAY = dedent(OUTPUTS_DISPLAY)
 
 # Main functions
 @run_in_process
-def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = './', execute_kwargs=None,
+def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_pos=False,
+                 working_dir = './', execute_kwargs=None,
                  out_path_db=None, out_path_ipynb=None, out_path_html=None, remove_db='always', add_timestamp=True,
                  hide_code_cells=False, mask_extra_code=False, display_links=True,
                  raise_exception=False, return_notebook=False, returned_value=None):
@@ -143,6 +144,8 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
         If some of the variables don't exist, no errors are raised.
     inputs_pos : int, optional
         Position to insert the cell with `inputs` loading into the notebook.
+    replace_inputs_pos : int, optional
+        Whether to replace `inputs_pos` code cell with `inputs` or insert a new one.
     working_dir : str
         The working directory of starting the kernel.
     out_path_db : str, optional
@@ -251,7 +254,11 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
         if mask_extra_code:
             code += INPUTS_DISPLAY
 
-        notebook['cells'].insert(inputs_pos, nbformat.v4.new_code_cell(code))
+        if replace_inputs_pos:
+            notebook['cells'][inputs_pos] = nbformat.v4.new_code_cell(code)
+        else:
+            notebook['cells'].insert(inputs_pos, nbformat.v4.new_code_cell(code))
+
 
     if outputs is not None:
         # Create a cell to extract outputs from the notebook
