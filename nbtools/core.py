@@ -162,6 +162,8 @@ def get_available_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False,
             print(f'Device {i} | Free memory: {fraction_free:4.2f} | '
                   f'Number of running processes: {num_processes:>2} | Free: {consider_available}')
 
+    nvidia_smi.nvmlShutdown()
+
     if isinstance(n, str) and n.startswith('max'):
         n = len(available_devices)
 
@@ -187,7 +189,7 @@ def get_gpu_free_memory(index):
     nvidia_smi.nvmlDeviceGetCount()
     handle = nvidia_smi.nvmlDeviceGetHandleByIndex(index)
     info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
-
+    nvidia_smi.nvmlShutdown()
     return info.free / info.total
 
 def set_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False, raise_error=False):
@@ -225,3 +227,31 @@ def set_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False, raise_err
     if verbose:
         print(f'{newline}`CUDA_VISIBLE_DEVICES` set to "{str_devices}"')
     return devices
+
+def free_gpus(devices=None):
+    """ Terminate all processes on gpu devices.
+
+    Parameters
+    ----------
+    devices : iterable of ints
+        Device indices to terminate processes.
+        If None, than free all available gpus.
+    """
+    import nvidia_smi
+    import psutil
+
+    nvidia_smi.nvmlInit()
+
+    if devices is None:
+        if 'CUDA_VISIBLE_DEVICES' in os.environ.keys():
+            devices = [int(d) for d in os.environ["CUDA_VISIBLE_DEVICES"].split(',')]
+        else:
+            devices = range(0, nvidia_smi.nvmlDeviceGetCount())
+
+    for device_index in devices:
+        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(device_index)
+
+        for proc in nvidia_smi.nvmlDeviceGetComputeRunningProcesses(handle):
+            psutil.Process(proc.pid).terminate()
+
+    nvidia_smi.nvmlShutdown()

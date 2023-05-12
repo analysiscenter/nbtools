@@ -46,6 +46,7 @@ class ResourceInspector:
 
             self._device_handles = {device_id : nvidia_smi.nvmlDeviceGetHandleByIndex(device_id)
                                     for device_id in range(n_devices)}
+            nvidia_smi.nvmlShutdown()
         return self._device_handles
 
     @property

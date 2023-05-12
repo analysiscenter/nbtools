@@ -15,6 +15,7 @@ def run_in_process(func):
     """ Decorator to run the `func` in a separated process for terminating all relevant processes properly. """
     @wraps(func)
     def _wrapper(*args, **kwargs):
+        # pylint: disable=bare-except
         returned_value = Queue()
         kwargs = {**kwargs, 'returned_value': returned_value}
 
@@ -25,7 +26,6 @@ def run_in_process(func):
             process.join()
 
         except:
-            # pylint: disable=bare-except
             # Terminate all relevant processes when something went wrong, e.g. Keyboard Interrupt
             for child in psutil.Process(process.pid).children():
                 if psutil.pid_exists(child.pid):
