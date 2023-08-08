@@ -50,12 +50,20 @@ class ResourceEntry(dict):
                         Resource.DEVICE_PROCESS_PID,]:
             pass
 
-        elif resource in [Resource.NAME, Resource.TYPE]:
+        elif resource == Resource.NAME:
             if data is not None:
-                if 'zombie' in data or 'container' in data:
-                    style = terminal.red
                 if '/' in data:
                     data = '~' + data.split('/')[-1]
+                if len(data) >= 60:
+                    data = data.replace('.ipynb', '').replace('.py', '')
+                    data = data[:30] + '[...]' + data[-30]
+
+        elif resource == Resource.TYPE:
+            if data is not None:
+                if 'zombie' in data or 'containerd' in data:
+                    style = terminal.red
+                if 'run_notebook' in data:
+                    style = terminal.green
 
         elif resource == Resource.CREATE_TIME:
             if data is not None:

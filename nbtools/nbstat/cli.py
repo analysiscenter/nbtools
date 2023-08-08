@@ -118,6 +118,12 @@ def output_looped(inspector, name, formatter, view_args,
                         elif inkey == 'm':
                             if formatter[Resource.DEVICE_UTIL]:
                                 formatter[Resource.DEVICE_UTIL_MA] = not formatter[Resource.DEVICE_UTIL_MA]
+                        elif inkey.code == 265:
+                            formatter[Resource.PID] = not formatter[Resource.PID]
+                        elif inkey.code == 266:
+                            formatter[Resource.CPU] = not formatter[Resource.CPU]
+                        elif inkey.code == 267:
+                            formatter[Resource.TYPE] = not formatter[Resource.TYPE]
                         elif inkey == 'q':
                             raise KeyboardInterrupt
                         else:

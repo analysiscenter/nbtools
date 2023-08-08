@@ -2,9 +2,63 @@
 #pylint: disable=import-outside-toplevel
 import os
 import time
+import json
+from functools import wraps
 from glob import glob
 from textwrap import dedent
+from multiprocessing import Process, Queue
+import psutil
 
+
+TMP_DIR = '/tmp/nbtools_run_notebook'
+os.makedirs(TMP_DIR, exist_ok=True)
+
+
+# Decorator
+def run_in_process(func):
+    """ Decorator to run the `func` in a separated process for terminating all relevant processes properly. """
+    @wraps(func)
+    def _wrapper(*args, **kwargs):
+        # pylint: disable=bare-except
+        returned_value = Queue()
+        kwargs = {**kwargs, 'returned_value': returned_value}
+
+        try:
+            process = Process(target=func, args=args, kwargs=kwargs)
+            process.start()
+
+            path = kwargs.get('path', args[0])
+            json_path = f'{TMP_DIR}/{process.pid}.json'
+            with open(json_path, 'w', encoding='utf-8') as file:
+                json.dump({'path': path}, file)
+
+            process.join()
+        except:
+            # Terminate all relevant processes when something went wrong, e.g. Keyboard Interrupt
+            for child in psutil.Process(process.pid).children():
+                if psutil.pid_exists(child.pid):
+                    child.terminate()
+
+            if psutil.pid_exists(process.pid):
+                process.terminate()
+        finally:
+            os.remove(json_path)
+
+        return returned_value.get()
+    return _wrapper
+
+def get_run_notebook_name(pid):
+    """ Check /tmp/ directory for logs of running `run_notebook` executors and extract name for a given pid. """
+    json_path = f'{TMP_DIR}/{pid}.json'
+    if not os.path.exists(json_path):
+        return 'run_notebook'
+    with open(json_path, 'r', encoding='utf-8') as file:
+        path = json.load(file)['path']
+    return path.split('/')[-1]
+
+
+
+# Code cells for insertion
 # Code fragments that are inserted in the notebook
 CELL_INSERT_COMMENT = "# Cell inserted during automated execution"
 
@@ -28,10 +82,17 @@ INPUTS_CODE_CELL = """
 
         locals().update(inputs)
 """
-YAML_IMPORT = """import yaml"""
-INPUTS_DISPLAY = """print(yaml.dump(inputs))"""
-
 INPUTS_CODE_CELL = dedent(INPUTS_CODE_CELL)
+
+INPUTS_DISPLAY = """
+    for k, v in inputs.items():
+        if isinstance(v, str):
+            print(f"{k} = '{v}'")
+        else:
+            print(f"{k} = {v}")
+""" # it is better than pprint, because pprint adds quotes on variable names
+# TODO: think about indentation for dicts and lists
+INPUTS_DISPLAY = dedent(INPUTS_DISPLAY)
 
 # Save notebook outputs
 OUTPUTS_CODE_CELL = """
@@ -46,15 +107,26 @@ OUTPUTS_CODE_CELL = """
     with shelve.open(out_path_db) as notebook_db:
         notebook_db['outputs'] = output
 """
-OUTPUTS_DISPLAY = """print(yaml.dump(output))"""
-
 OUTPUTS_CODE_CELL = dedent(OUTPUTS_CODE_CELL)
 
+OUTPUTS_DISPLAY = """
+    for k, v in output.items():
+        if isinstance(v, str):
+            print(f"{k} = '{v}'")
+        else:
+            print(f"{k} = {v}")
+"""
+OUTPUTS_DISPLAY = dedent(OUTPUTS_DISPLAY)
 
-def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = './', execute_kwargs=None,
+
+
+# Main functions
+@run_in_process
+def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_pos=False,
+                 working_dir = './', execute_kwargs=None,
                  out_path_db=None, out_path_ipynb=None, out_path_html=None, remove_db='always', add_timestamp=True,
                  hide_code_cells=False, mask_extra_code=False, display_links=True,
-                 raise_exception=False, return_notebook=False):
+                 raise_exception=False, return_notebook=False, returned_value=None):
     """ Execute a Jupyter Notebook programmatically.
     Heavily inspired by https://github.com/tritemio/nbrun.
 
@@ -92,6 +164,8 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
         If some of the variables don't exist, no errors are raised.
     inputs_pos : int, optional
         Position to insert the cell with `inputs` loading into the notebook.
+    replace_inputs_pos : int, optional
+        Whether to replace `inputs_pos` code cell with `inputs` or insert a new one.
     working_dir : str
         The working directory of starting the kernel.
     out_path_db : str, optional
@@ -125,6 +199,8 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
         Whether to re-raise exceptions from the notebook.
     return_notebook : bool, optional
         Whether to return the notebook object from this function.
+    returned_value : None
+        Placeholder for the :func:`~.run_in_process` decorator to return this function result.
 
     Returns
     -------
@@ -163,6 +239,9 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
                 error_message = dedent(error_message)
                 raise ValueError(error_message)
 
+        # `out_path_db` is db path for current method, for db reading from the executed notebook we need relative path:
+        working_dir_out_path_db = os.path.relpath(out_path_db, start=working_dir)
+
         # Create a shelve database
         shelve.Pickler = Pickler
         shelve.Unpickler = Unpickler
@@ -173,13 +252,14 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
     if isinstance(outputs, str):
         outputs = [outputs]
 
-    execute_kwargs = execute_kwargs or {'timeout': -1}
+    execute_kwargs = {'timeout': -1} if execute_kwargs is None else {'timeout': -1, **execute_kwargs}
     executor = ExecutePreprocessor(**execute_kwargs)
     kernel_manager = KernelManager()
 
     # Notebook preparation:
     # Read the notebook, insert a cell with inputs, insert another cell for outputs extraction
-    notebook = nbformat.read(path, as_version=4)
+    with open(path, encoding='utf-8') as file:
+        notebook = nbformat.read(file, as_version=4)
 
     if hide_code_cells:
         notebook["metadata"].update({"hide_input": True})
@@ -190,23 +270,25 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
         with shelve.open(out_path_db) as notebook_db:
             notebook_db.update(inputs)
 
-        code = CELL_INSERT_COMMENT + DB_CONNECT_CODE_CELL.format(repr(out_path_db)) + INPUTS_CODE_CELL
+        code = CELL_INSERT_COMMENT + DB_CONNECT_CODE_CELL.format(repr(working_dir_out_path_db)) + INPUTS_CODE_CELL
         if mask_extra_code:
-            code += YAML_IMPORT + '\n' + INPUTS_DISPLAY
+            code += INPUTS_DISPLAY
 
-        notebook['cells'].insert(inputs_pos, nbformat.v4.new_code_cell(code))
+        if replace_inputs_pos:
+            notebook['cells'][inputs_pos] = nbformat.v4.new_code_cell(code)
+        else:
+            notebook['cells'].insert(inputs_pos, nbformat.v4.new_code_cell(code))
+
 
     if outputs is not None:
         # Create a cell to extract outputs from the notebook
         # It saves locals from the notebook with preferred names in the shelve database
         # This cell will be executed in error case too
         code = CELL_INSERT_COMMENT + \
-               (DB_CONNECT_CODE_CELL.format(repr(out_path_db)) if not inputs else "") + \
+               (DB_CONNECT_CODE_CELL.format(repr(working_dir_out_path_db)) if not inputs else "") + \
                OUTPUTS_CODE_CELL.format(outputs)
 
         if mask_extra_code:
-            if inputs is None:
-                code = YAML_IMPORT + '\n' + code
             code += OUTPUTS_DISPLAY
 
         output_cell = nbformat.v4.new_code_cell(code)
@@ -228,7 +310,9 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
         if raise_exception:
             raise
     finally:
-        kernel_manager.shutdown_kernel()
+        # Shutdown kernel
+        kernel_manager.cleanup_resources()
+        kernel_manager.shutdown_kernel(now=True)
 
         # Extract information from the database and remove it (if exists)
         if outputs is not None:
@@ -283,7 +367,8 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, working_dir = '.
 
         if return_notebook:
             exec_res['notebook'] = notebook
-        return exec_res
+
+        returned_value.put(exec_res) # return for parent process
 
 # Mask functions for database operations cells
 def mask_inputs_reading(notebook, pos):
@@ -300,9 +385,7 @@ def mask_inputs_reading(notebook, pos):
 
     execution_count = notebook['cells'][pos]['execution_count']
 
-    code_mask = str(notebook['cells'][pos]['outputs'][0]['text']).split('\n')
-    code_mask = [variable.replace(':', ' =', 1) for variable in code_mask]
-    code_mask = '\n'.join(code_mask)[:-2]
+    code_mask = str(notebook['cells'][pos]['outputs'][0]['text'])[:-1]
 
     cell_mask = nbformat.v4.new_code_cell(source=code_mask, execution_count=execution_count)
     notebook['cells'][pos] = cell_mask
@@ -326,7 +409,7 @@ def mask_outputs_dumping(notebook, pos):
     text_mask = ''
 
     for variable in outputs_variables:
-        separator_pos = int(variable.find(':'))
+        separator_pos = int(variable.find(' = '))
 
         if separator_pos != -1:
             variable_name = variable[:separator_pos]
@@ -335,7 +418,6 @@ def mask_outputs_dumping(notebook, pos):
             code_mask += f'print({variable_name})\n'
             text_mask += variable_value
 
-    code_mask = code_mask[:-1]
     outputs_mask =  [nbformat.v4.new_output(text=text_mask, name='stdout', output_type='stream')]
 
     cell_mask = nbformat.v4.new_code_cell(source=code_mask, execution_count=execution_count, outputs=outputs_mask)
@@ -369,6 +451,7 @@ def notebook_to_html(notebook, out_path_html, display_link):
         display(FileLink(out_path_html))
 
 
+# Traceback postprocessing
 def extract_traceback(notebook):
     """ Extracts information about an error from the notebook.
 

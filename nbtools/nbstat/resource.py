@@ -1,5 +1,9 @@
 """ Resource -- a class to describe a property of an entry. Refer to class documentation for more. """
-from enum import Enum, auto
+from enum import Enum
+
+# `enum.Auto` is bugged in Python 3.11
+int_generator = iter(range(0, 10000))
+auto = lambda: next(int_generator)
 
 
 class Resource(Enum):
