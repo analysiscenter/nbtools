@@ -2,12 +2,16 @@
 #pylint: disable=import-outside-toplevel
 import os
 import time
+import json
 from functools import wraps
 from glob import glob
 from textwrap import dedent
 from multiprocessing import Process, Queue
 import psutil
 
+
+TMP_DIR = '/tmp/nbtools_run_notebook'
+os.makedirs(TMP_DIR, exist_ok=True)
 
 
 # Decorator
@@ -21,10 +25,14 @@ def run_in_process(func):
 
         try:
             process = Process(target=func, args=args, kwargs=kwargs)
-
             process.start()
-            process.join()
 
+            path = kwargs.get('path', args[0])
+            json_path = f'{TMP_DIR}/{process.pid}.json'
+            with open(json_path, 'w', encoding='utf-8') as file:
+                json.dump({'path': path}, file)
+
+            process.join()
         except:
             # Terminate all relevant processes when something went wrong, e.g. Keyboard Interrupt
             for child in psutil.Process(process.pid).children():
@@ -33,9 +41,21 @@ def run_in_process(func):
 
             if psutil.pid_exists(process.pid):
                 process.terminate()
+        finally:
+            os.remove(json_path)
 
         return returned_value.get()
     return _wrapper
+
+def get_run_notebook_name(pid):
+    """ Check /tmp/ directory for logs of running `run_notebook` executors and extract name for a given pid. """
+    json_path = f'{TMP_DIR}/{pid}.json'
+    if not os.path.exists(json_path):
+        return 'run_notebook'
+    with open(json_path, 'r', encoding='utf-8') as file:
+        path = json.load(file)['path']
+    return path.split('/')[-1]
+
 
 
 # Code cells for insertion

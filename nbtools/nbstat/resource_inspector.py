@@ -13,12 +13,14 @@ import nvidia_smi
 from .resource import Resource
 from .resource_table import ResourceTable
 from .utils import format_memory, pid_to_name, pid_to_ngid, true_len, true_rjust, true_center, FiniteList
+from ..run_notebook import get_run_notebook_name
 
 
 
 KERNEL_ID_SEARCHER   = re.compile('kernel-(.*).json').search
 VSCODE_KEY_SEARCHER  = re.compile('key=b"(.*)"').search
 SCRIPT_NAME_SEARCHER = re.compile('python.* (.*).py').search
+RUN_NOTEBOOK_PATH_SEARCHER = re.compile('/tmp/.*.json.*--HistoryManager.hist_file=:memory:.*').search
 
 
 class ResourceInspector:
@@ -46,7 +48,6 @@ class ResourceInspector:
 
             self._device_handles = {device_id : nvidia_smi.nvmlDeviceGetHandleByIndex(device_id)
                                     for device_id in range(n_devices)}
-            nvidia_smi.nvmlShutdown()
         return self._device_handles
 
     @property
@@ -233,6 +234,7 @@ class ResourceInspector:
                     kernel_id = KERNEL_ID_SEARCHER(cmdline)
                     vscode_key = VSCODE_KEY_SEARCHER(cmdline)
                     script_name = SCRIPT_NAME_SEARCHER(cmdline)
+                    run_notebook_path = RUN_NOTEBOOK_PATH_SEARCHER(cmdline)
 
                     if kernel_id:
                         # The name will be changed by data from `notebook_table`.
@@ -246,6 +248,11 @@ class ResourceInspector:
                         type_ = 'vscode'
                         name = vscode_key.group(1).split('-')[0] + '.ipynb'
                         path = kernel_id = vscode_key.group(1)
+                    elif run_notebook_path:
+                        type_ = 'run_notebook'
+                        name = get_run_notebook_name(process.ppid())
+                        path = cwd
+                        kernel_id = None
                     elif script_name:
                         type_ = 'script'
                         name = script_name.group(1) + '.py'
@@ -259,7 +266,10 @@ class ResourceInspector:
 
                     # PYTHON_PPID = PPID if parent is Python process else -1
                     ppid = process.ppid()
-                    if ppid in python_pids:
+                    if type_ == 'run_notebook':
+                        # Spawned by `run_notebook` function of the library
+                        python_ppid = ppid
+                    elif ppid in python_pids:
                         # Spawned by one of other Python processes
                         type_ = 'subprocess'
                         python_ppid = ppid
@@ -495,6 +505,12 @@ class ResourceInspector:
             table = self.make_gpustat_table(formatter=formatter, window=window)
         else:
             raise ValueError('Wrong name of view to get!')
+
+        # Filter some processes
+        if table:
+            bad_names = ['lsp_server']
+            function = lambda index_value, _: not any(name in index_value for name in bad_names)
+            table.filter_on_index(function, inplace=True)
 
         # Filter index of the table by a regular expression
         if table and index_condition is not None:
