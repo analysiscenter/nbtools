@@ -507,7 +507,7 @@ class ResourceInspector:
             raise ValueError('Wrong name of view to get!')
 
         # Filter some processes
-        if table:
+        if 'nb' in name and table:
             bad_names = ['lsp_server']
             function = lambda index_value, _: not any(name in index_value for name in bad_names)
             table.filter_on_index(function, inplace=True)
