@@ -23,15 +23,18 @@ def run_in_process(func):
         returned_value = Queue()
         kwargs = {**kwargs, 'returned_value': returned_value}
 
+        json_path = None
+
         try:
             process = Process(target=func, args=args, kwargs=kwargs)
             process.start()
 
-            path = kwargs.get('path', args[0])
+            path = args[0] if args else kwargs['path']
             json_path = f'{TMP_DIR}/{process.pid}.json'
             with open(json_path, 'w', encoding='utf-8') as file:
                 json.dump({'path': path}, file)
 
+            output = returned_value.get()
             process.join()
         except:
             # Terminate all relevant processes when something went wrong, e.g. Keyboard Interrupt
@@ -42,9 +45,10 @@ def run_in_process(func):
             if psutil.pid_exists(process.pid):
                 process.terminate()
         finally:
-            os.remove(json_path)
+            if json_path is not None and os.path.exists(json_path):
+                os.remove(json_path)
 
-        return returned_value.get()
+        return output
     return _wrapper
 
 def get_run_notebook_name(pid):
@@ -369,6 +373,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
             exec_res['notebook'] = notebook
 
         returned_value.put(exec_res) # return for parent process
+        return
 
 # Mask functions for database operations cells
 def mask_inputs_reading(notebook, pos):
