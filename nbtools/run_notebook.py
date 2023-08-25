@@ -310,9 +310,6 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
         if outputs is not None:
             executor.kc = kernel_manager.client() # For compatibility with 5.x.x version of `nbconvert`
             executor.preprocess_cell(output_cell, {'metadata': {'path': working_dir}}, -1)
-
-        if raise_exception:
-            raise
     finally:
         # Shutdown kernel
         kernel_manager.cleanup_resources()
@@ -336,6 +333,10 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
 
             for path_ in db_paths:
                 os.remove(path_)
+
+        # Re-raise exception if needed
+        if failed and raise_exception:
+            raise Exception(traceback_message)
 
         # Prepare execution results: execution state, notebook outputs and error info (if exists)
         if failed:
