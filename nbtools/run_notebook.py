@@ -48,6 +48,9 @@ def run_in_process(func):
             if json_path is not None and os.path.exists(json_path):
                 os.remove(json_path)
 
+            if kwargs.get('raise_exception') and output['failed']:
+                raise Exception(output['traceback'])
+
         return output
     return _wrapper
 
@@ -334,13 +337,14 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
             for path_ in db_paths:
                 os.remove(path_)
 
-        # Re-raise exception if needed
-        if failed and raise_exception:
-            raise Exception(traceback_message)
-
         # Prepare execution results: execution state, notebook outputs and error info (if exists)
         if failed:
             exec_res = {'failed': failed, 'failed cell number': error_cell_num, 'traceback': traceback_message}
+
+            # Re-raise exception if needed
+            if raise_exception:
+                returned_value.put(exec_res)
+                return None
         else:
             exec_res = {'failed': failed, 'failed cell number': None, 'traceback': ''}
 
