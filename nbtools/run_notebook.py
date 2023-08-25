@@ -48,7 +48,7 @@ def run_in_process(func):
             if json_path is not None and os.path.exists(json_path):
                 os.remove(json_path)
 
-            if kwargs.get('raise_exception') and output['failed']:
+            if kwargs.get('raise_exception', False) and output['failed']:
                 raise Exception(output['traceback'])
 
         return output
