@@ -19,11 +19,13 @@ def run_in_process(func):
     """ Decorator to run the `func` in a separated process for terminating all relevant processes properly. """
     @wraps(func)
     def _wrapper(*args, **kwargs):
-        # pylint: broad-exception-raised
+        # pylint:  broad-exception-caught, W0719
         returned_value = Queue()
         kwargs = {**kwargs, 'returned_value': returned_value}
 
         json_path = None
+
+        output = {'failed': True, 'traceback': ''}
 
         try:
             process = Process(target=func, args=args, kwargs=kwargs)
