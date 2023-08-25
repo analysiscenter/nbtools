@@ -19,7 +19,7 @@ def run_in_process(func):
     """ Decorator to run the `func` in a separated process for terminating all relevant processes properly. """
     @wraps(func)
     def _wrapper(*args, **kwargs):
-        # pylint: disable=bare-except
+        # pylint: broad-exception-raised
         returned_value = Queue()
         kwargs = {**kwargs, 'returned_value': returned_value}
 
@@ -31,12 +31,15 @@ def run_in_process(func):
 
             path = args[0] if args else kwargs['path']
             json_path = f'{TMP_DIR}/{process.pid}.json'
+
             with open(json_path, 'w', encoding='utf-8') as file:
                 json.dump({'path': path}, file)
 
             output = returned_value.get()
             process.join()
-        except:
+        except Exception as e:
+            output = {'failed': True, 'traceback': e}
+
             # Terminate all relevant processes when something went wrong, e.g. Keyboard Interrupt
             for child in psutil.Process(process.pid).children():
                 if psutil.pid_exists(child.pid):
@@ -378,7 +381,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
             exec_res['notebook'] = notebook
 
         returned_value.put(exec_res) # return for parent process
-        return
+        return None
 
 # Mask functions for database operations cells
 def mask_inputs_reading(notebook, pos):
