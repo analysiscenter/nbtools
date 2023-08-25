@@ -19,7 +19,7 @@ def run_in_process(func):
     """ Decorator to run the `func` in a separated process for terminating all relevant processes properly. """
     @wraps(func)
     def _wrapper(*args, **kwargs):
-        # pylint:  broad-exception-caught, W0719
+        # pylint:  broad-exception-caught, broad-exception-raised
         returned_value = Queue()
         kwargs = {**kwargs, 'returned_value': returned_value}
 
