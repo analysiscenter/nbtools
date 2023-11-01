@@ -260,10 +260,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
 
     execute_kwargs = {'timeout': -1} if execute_kwargs is None else {'timeout': -1, **execute_kwargs}
     executor = ExecutePreprocessor(**execute_kwargs)
-    if kernel_name is None:
-        kernel_manager = KernelManager()
-    else:
-        kernel_manager = KernelManager(kernel_name=kernel_name)
+    kernel_manager = KernelManager() if kernel_name is None else KernelManager(kernel_name=kernel_name)
 
     # Notebook preparation:
     # Read the notebook, insert a cell with inputs, insert another cell for outputs extraction
