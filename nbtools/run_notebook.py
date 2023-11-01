@@ -130,7 +130,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
                  working_dir = './', execute_kwargs=None,
                  out_path_db=None, out_path_ipynb=None, out_path_html=None, remove_db='always', add_timestamp=True,
                  hide_code_cells=False, mask_extra_code=False, display_links=True,
-                 raise_exception=False, return_notebook=False, returned_value=None):
+                 raise_exception=False, return_notebook=False, returned_value=None, kernel_name=None):
     """ Execute a Jupyter Notebook programmatically.
     Heavily inspired by https://github.com/tritemio/nbrun.
 
@@ -205,6 +205,8 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
         Whether to return the notebook object from this function.
     returned_value : None
         Placeholder for the :func:`~.run_in_process` decorator to return this function result.
+    kernel_name : str, optional
+        Kernel to use. If None, default kernel.
 
     Returns
     -------
@@ -258,7 +260,10 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
 
     execute_kwargs = {'timeout': -1} if execute_kwargs is None else {'timeout': -1, **execute_kwargs}
     executor = ExecutePreprocessor(**execute_kwargs)
-    kernel_manager = KernelManager()
+    if kernel_name is None:
+        kernel_manager = KernelManager()
+    else:
+        kernel_manager = KernelManager(kernel_name=kernel_name)
 
     # Notebook preparation:
     # Read the notebook, insert a cell with inputs, insert another cell for outputs extraction
