@@ -198,6 +198,9 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
         Note, that database exists only if inputs and/or outputs are provided.
     execute_kwargs : dict, optional
         Parameters of `:class:ExecutePreprocessor`.
+        For example, you can provide timeout, kernel_name, resources (such as metadata)
+        and other `nbclient.client.NotebookClient` arguments from :ref:`the NotebookClient doc page
+        <https://nbclient.readthedocs.io/en/latest/reference/nbclient.html#nbclient.client.NotebookClient>`.
     add_timestamp : bool, optional
         Whether to add a cell with execution information at the beginning of the saved notebook.
     hide_code_cells : bool, optional
