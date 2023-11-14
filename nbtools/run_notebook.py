@@ -19,7 +19,7 @@ def run_in_process(func):
     """ Decorator to run the `func` in a separated process for terminating all relevant processes properly. """
     @wraps(func)
     def _wrapper(*args, **kwargs):
-        # pylint:  broad-exception-caught, broad-exception-raised
+        # pylint: disable=broad-exception-caught, broad-exception-raised
         returned_value = Queue()
         kwargs = {**kwargs, 'returned_value': returned_value}
 
@@ -235,7 +235,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
            Executed notebook object.
            Note that this output is provided only if `return_notebook` is True.
     """
-    # pylint: disable=bare-except, lost-exception
+    # pylint: disable=bare-except, lost-exception, return-in-finally
     import nbformat
     from jupyter_client.manager import KernelManager
     from nbconvert.preprocessors import ExecutePreprocessor
@@ -386,7 +386,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
             exec_res['notebook'] = notebook
 
         returned_value.put(exec_res) # return for parent process
-        return None
+    return None
 
 # Mask functions for database operations cells
 def mask_inputs_reading(notebook, pos):
