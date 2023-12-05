@@ -1,6 +1,7 @@
 """ Functions for code quality control of Jupyter Notebooks. """
 #pylint: disable=import-outside-toplevel
 import os
+import sys
 
 from .core import StringWithDisabledRepr, get_notebook_path, notebook_to_script
 
@@ -101,7 +102,10 @@ def pylint_notebook(path=None, options=(), disable=(), enable=(), printer=print,
     pylint_params : dict
         Additional parameter of linting. Each is converted to a separate valid entry in the `pylintrc` file.
     """
-    from pylint import epylint as lint
+    from io import StringIO
+    from pylint.lint import Run
+    from pylint.reporters.text import TextReporter
+
     path = path or get_notebook_path()
     if path is None:
         raise ValueError('Provide path to Jupyter Notebook or run `pylint_notebook` inside of it!')
@@ -117,11 +121,23 @@ def pylint_notebook(path=None, options=(), disable=(), enable=(), printer=print,
     pylintrc = generate_pylintrc(path_pylintrc, disable=disable, enable=enable, **pylint_params)
 
     # Run pylint on script with pylintrc configuration
-    pylint_cmdline = ' '.join([path_pylintrc, f'--rcfile {path_pylintrc}', *options])
-    pylint_stdout, pylint_stderr = lint.py_run(pylint_cmdline, return_std=True)
+    pylint_cmdline = [path_pylintrc, f'--rcfile={path_pylintrc}', *options]
 
-    errors = pylint_stderr.getvalue()
+    # Custom streams for catching messagies
+    pylint_stdout = StringIO()
+
+    base_stderr = sys.stderr
+    sys.stderr = StringIO()
+
+    # Run pylint
+    reporter = TextReporter(pylint_stdout)
+    Run(pylint_cmdline, reporter=reporter, exit=False)
+
+    # Parse outputs and get back stderr
     report = pylint_stdout.getvalue()
+
+    errors = sys.stderr.getvalue()
+    sys.stderr = base_stderr
 
     # Prepare custom report
     output = []
@@ -133,9 +149,10 @@ def pylint_notebook(path=None, options=(), disable=(), enable=(), printer=print,
 
         elif path_script in line or script_name in line:
             line = line.replace(path_script, '__').replace(script_name, '__')
+            line_semicolon_split = line.split(':')
 
             # Locate the cell and line inside the cell
-            code_line_number = int(line.split(':')[1])
+            code_line_number = int(line_semicolon_split[1])
             for cell_number, cell_ranges in cell_line_numbers.items():
                 if code_line_number in cell_ranges:
                     cell_line_number = code_line_number - cell_ranges[0]
@@ -144,12 +161,12 @@ def pylint_notebook(path=None, options=(), disable=(), enable=(), printer=print,
                 cell_number, cell_line_number = -1, code_line_number
 
             # Find error_code and error_name: for example, `C0123` and `invalid-name`
-            position_left  = line.find('(') + 1
-            position_right = line.find(')') - 1
-            error_message = line[position_left : position_right]
-            error_human_message = line[position_right + 2:]
-            error_code, error_name, *_ = error_message.split(',')
-            error_name = error_name.strip()
+            error_code = line_semicolon_split[3].strip()
+
+            error_message = line_semicolon_split[4].strip()
+            error_human_message, error_name = error_message.split('(')
+            error_human_message = error_human_message.strip()
+            error_name = error_name[:-1]
 
             # Make new message
             message = f'Cell {cell_number}:{cell_line_number}, code={error_code}, name={error_name}'
