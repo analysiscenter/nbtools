@@ -143,6 +143,8 @@ def pylint_notebook(path=None, options=(), disable=(), enable=(), printer=print,
     output = []
 
     for line in report.split('\n'):
+        # error line is a str in the format:
+        # "filename.py:line_num:position_num: error_code: error_text (error_name)"
         if 'rated' in line:
             output.insert(0, line.strip(' '))
             output.insert(1, '–' * (len(line) - 1))
@@ -164,9 +166,10 @@ def pylint_notebook(path=None, options=(), disable=(), enable=(), printer=print,
             error_code = line_semicolon_split[3].strip()
 
             error_message = line_semicolon_split[4].strip()
-            error_human_message, error_name = error_message.split('(')
-            error_human_message = error_human_message.strip()
-            error_name = error_name[:-1]
+            error_name_start  = error_message.rfind('(')
+
+            error_human_message = error_message[:error_name_start].strip()
+            error_name = error_message[error_name_start+1:-1]
 
             # Make new message
             message = f'Cell {cell_number}:{cell_line_number}, code={error_code}, name={error_name}'
