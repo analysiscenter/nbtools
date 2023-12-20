@@ -20,8 +20,8 @@ def run_in_process(func):
     @wraps(func)
     def _wrapper(*args, **kwargs):
         # pylint: disable=broad-exception-caught, broad-exception-raised
-        returned_value = Queue()
-        kwargs = {**kwargs, 'returned_value': returned_value}
+        _output_queue = Queue()
+        kwargs = {**kwargs, '_output_queue': _output_queue}
 
         json_path = None
 
@@ -37,7 +37,7 @@ def run_in_process(func):
             with open(json_path, 'w', encoding='utf-8') as file:
                 json.dump({'path': path}, file)
 
-            output = returned_value.get()
+            output = _output_queue.get()
             process.join()
         except Exception as e:
             output = {'failed': True, 'traceback': e}
@@ -138,7 +138,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
                  working_dir = './', execute_kwargs=None,
                  out_path_db=None, out_path_ipynb=None, out_path_html=None, remove_db='always', add_timestamp=True,
                  hide_code_cells=False, mask_extra_code=False, display_links=True,
-                 raise_exception=False, return_notebook=False, returned_value=None):
+                 raise_exception=False, return_notebook=False, _output_queue=None):
     """ Execute a Jupyter Notebook programmatically.
     Heavily inspired by https://github.com/tritemio/nbrun.
 
@@ -214,7 +214,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
         Whether to re-raise exceptions from the notebook.
     return_notebook : bool, optional
         Whether to return the notebook object from this function.
-    returned_value : None
+    _output_queue : None
         Placeholder for the :func:`~.run_in_process` decorator to return this function result.
 
     Returns
@@ -351,7 +351,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
 
             # Re-raise exception if needed
             if raise_exception:
-                returned_value.put(exec_res)
+                _output_queue.put(exec_res)
                 return None
         else:
             exec_res = {'failed': failed, 'failed cell number': None, 'traceback': ''}
@@ -385,7 +385,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
         if return_notebook:
             exec_res['notebook'] = notebook
 
-        returned_value.put(exec_res) # return for parent process
+        _output_queue.put(exec_res) # return for parent process
     return None
 
 # Mask functions for database operations cells

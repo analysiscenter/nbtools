@@ -1,7 +1,8 @@
 """ Functions for code quality control of Jupyter Notebooks. """
 #pylint: disable=import-outside-toplevel
 import os
-import sys
+from io import StringIO
+from contextlib import redirect_stderr, redirect_stdout
 
 from .core import StringWithDisabledRepr, get_notebook_path, notebook_to_script
 
@@ -102,9 +103,12 @@ def pylint_notebook(path=None, options=(), disable=(), enable=(), printer=print,
     pylint_params : dict
         Additional parameter of linting. Each is converted to a separate valid entry in the `pylintrc` file.
     """
-    from io import StringIO
-    from pylint.lint import Run
-    from pylint.reporters.text import TextReporter
+    try:
+        from pylint.lint import Run
+        from pylint.reporters.text import TextReporter
+    except ImportError as exception:
+        raise ImportError('Install pylint') from exception
+
 
     path = path or get_notebook_path()
     if path is None:
@@ -123,21 +127,13 @@ def pylint_notebook(path=None, options=(), disable=(), enable=(), printer=print,
     # Run pylint on script with pylintrc configuration
     pylint_cmdline = [path_pylintrc, f'--rcfile={path_pylintrc}', *options]
 
-    # Custom streams for catching messagies
-    pylint_stdout = StringIO()
+    # Run pylint and catch messagies
+    with redirect_stdout(StringIO()) as pylint_stdout, redirect_stderr(StringIO()) as pylint_stderr:
+        reporter = TextReporter(pylint_stdout)
+        Run(pylint_cmdline, reporter=reporter, exit=False)
 
-    base_stderr = sys.stderr
-    sys.stderr = StringIO()
-
-    # Run pylint
-    reporter = TextReporter(pylint_stdout)
-    Run(pylint_cmdline, reporter=reporter, exit=False)
-
-    # Parse outputs and get back stderr
-    report = pylint_stdout.getvalue()
-
-    errors = sys.stderr.getvalue()
-    sys.stderr = base_stderr
+        report = pylint_stdout.getvalue()
+        errors = pylint_stderr.getvalue()
 
     # Prepare custom report
     output = []
