@@ -19,11 +19,13 @@ def run_in_process(func):
     """ Decorator to run the `func` in a separated process for terminating all relevant processes properly. """
     @wraps(func)
     def _wrapper(*args, **kwargs):
-        # pylint: disable=bare-except
-        returned_value = Queue()
-        kwargs = {**kwargs, 'returned_value': returned_value}
+        # pylint: disable=broad-exception-caught, broad-exception-raised
+        _output_queue = Queue()
+        kwargs = {**kwargs, '_output_queue': _output_queue}
 
         json_path = None
+
+        output = {'failed': True, 'traceback': ''}
 
         try:
             process = Process(target=func, args=args, kwargs=kwargs)
@@ -31,12 +33,15 @@ def run_in_process(func):
 
             path = args[0] if args else kwargs['path']
             json_path = f'{TMP_DIR}/{process.pid}.json'
+
             with open(json_path, 'w', encoding='utf-8') as file:
                 json.dump({'path': path}, file)
 
-            output = returned_value.get()
+            output = _output_queue.get()
             process.join()
-        except:
+        except Exception as e:
+            output = {'failed': True, 'traceback': e}
+
             # Terminate all relevant processes when something went wrong, e.g. Keyboard Interrupt
             for child in psutil.Process(process.pid).children():
                 if psutil.pid_exists(child.pid):
@@ -47,6 +52,9 @@ def run_in_process(func):
         finally:
             if json_path is not None and os.path.exists(json_path):
                 os.remove(json_path)
+
+            if kwargs.get('raise_exception', False) and output['failed']:
+                raise Exception(output['traceback'])
 
         return output
     return _wrapper
@@ -130,7 +138,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
                  working_dir = './', execute_kwargs=None,
                  out_path_db=None, out_path_ipynb=None, out_path_html=None, remove_db='always', add_timestamp=True,
                  hide_code_cells=False, mask_extra_code=False, display_links=True,
-                 raise_exception=False, return_notebook=False, returned_value=None):
+                 raise_exception=False, return_notebook=False, _output_queue=None):
     """ Execute a Jupyter Notebook programmatically.
     Heavily inspired by https://github.com/tritemio/nbrun.
 
@@ -190,6 +198,9 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
         Note, that database exists only if inputs and/or outputs are provided.
     execute_kwargs : dict, optional
         Parameters of `:class:ExecutePreprocessor`.
+        For example, you can provide timeout, kernel_name, resources (such as metadata)
+        and other `nbclient.client.NotebookClient` arguments from :ref:`the NotebookClient doc page
+        <https://nbclient.readthedocs.io/en/latest/reference/nbclient.html#nbclient.client.NotebookClient>`.
     add_timestamp : bool, optional
         Whether to add a cell with execution information at the beginning of the saved notebook.
     hide_code_cells : bool, optional
@@ -203,7 +214,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
         Whether to re-raise exceptions from the notebook.
     return_notebook : bool, optional
         Whether to return the notebook object from this function.
-    returned_value : None
+    _output_queue : None
         Placeholder for the :func:`~.run_in_process` decorator to return this function result.
 
     Returns
@@ -224,7 +235,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
            Executed notebook object.
            Note that this output is provided only if `return_notebook` is True.
     """
-    # pylint: disable=bare-except, lost-exception
+    # pylint: disable=bare-except, lost-exception, return-in-finally
     import nbformat
     from jupyter_client.manager import KernelManager
     from nbconvert.preprocessors import ExecutePreprocessor
@@ -310,9 +321,6 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
         if outputs is not None:
             executor.kc = kernel_manager.client() # For compatibility with 5.x.x version of `nbconvert`
             executor.preprocess_cell(output_cell, {'metadata': {'path': working_dir}}, -1)
-
-        if raise_exception:
-            raise
     finally:
         # Shutdown kernel
         kernel_manager.cleanup_resources()
@@ -340,6 +348,11 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
         # Prepare execution results: execution state, notebook outputs and error info (if exists)
         if failed:
             exec_res = {'failed': failed, 'failed cell number': error_cell_num, 'traceback': traceback_message}
+
+            # Re-raise exception if needed
+            if raise_exception:
+                _output_queue.put(exec_res)
+                return None
         else:
             exec_res = {'failed': failed, 'failed cell number': None, 'traceback': ''}
 
@@ -372,8 +385,8 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
         if return_notebook:
             exec_res['notebook'] = notebook
 
-        returned_value.put(exec_res) # return for parent process
-        return
+        _output_queue.put(exec_res) # return for parent process
+    return None
 
 # Mask functions for database operations cells
 def mask_inputs_reading(notebook, pos):
