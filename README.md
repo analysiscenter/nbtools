@@ -71,19 +71,19 @@ Eliminates an enormous amount of bugs and unexpected behaviors related to GPU us
 
 ```python
 from nbtools import set_gpus, free_gpus
-used_gpus = set_gpus(n=2,                  # Number of devices to set.
-                     min_free_memory=0.7,  # Minimum amount of free memory on device to consider it free.
-                     max_processes=3)      # Maximum amount of  processes  on device to consider it free.
-free_gpus(used_gpus)                       # Kill all the processes on selected GPUs. Useful at teardown.
+used_gpus = set_gpus(n=2,                # Number of devices to set.
+                     min_free_memory=0.7,# Minimum amount of free memory on device to consider free.
+                     max_processes=3)    # Maximum amount of  processes  on device to consider free.
+free_gpus(used_gpus)                     # Kill all processes on selected GPUs. Useful at teardown.
 ```
 
 ### Other functions
 ```python
-from nbtools import (in_notebook,          # Return True if executed inside of Jupyter Notebook
-                     get_notebook_path,    # If executed in Jupyter Notebook, return its absolute path
-                     get_notebook_name,    # If executed in Jupyter Notebook, return its name
-                     notebook_to_script)   # Convert Jupyter Notebook to an executable Python script.
-                                           # Works well with magics and command line executions.
+from nbtools import (in_notebook,         # Return True if executed inside of Jupyter Notebook
+                     get_notebook_path,   # If executed in Jupyter Notebook, return its absolute path
+                     get_notebook_name,   # If executed in Jupyter Notebook, return its name
+                     notebook_to_script)  # Convert Jupyter Notebook to an executable Python script.
+                                          # Works well with magics and command line executions.
 ```
 
 
