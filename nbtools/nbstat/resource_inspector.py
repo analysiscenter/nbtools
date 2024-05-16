@@ -12,7 +12,7 @@ import nvidia_smi
 
 from .resource import Resource
 from .resource_table import ResourceTable
-from .utils import format_memory, pid_to_name, pid_to_ngid, true_len, true_rjust, true_center, FiniteList
+from .utils import format_memory, pid_to_name, pid_to_ngid, FiniteList
 from ..run_notebook import get_run_notebook_name
 
 
@@ -575,16 +575,17 @@ class ResourceInspector:
             lines = self.add_help(lines, terminal=terminal,
                                   underline=underline_help, bold=bold_help)
 
-        # Select visible #TODO: fix indexing
-        h_start = int(add_header) + int(separate_header)
-        h_end = 2*int(add_footnote) + int(separate_footnote) + 2*int(add_help)
-        h_size = terminal.height - h_start - h_end - 5
+        # Select visible
+        if 'watch' in name:
+            h_start = int(add_header) + int(separate_header)
+            h_end = 2*int(add_footnote) + int(separate_footnote) + 2*int(add_help)
+            h_size = terminal.height - h_start - h_end - 5
 
-        self._h_position = max(0, min(self._h_position + h_change, len(lines) - h_start - h_end - h_size - 1))
-        h_slice_start = h_start + self._h_position
-        h_slice_end = h_slice_start + h_size
-        if len(lines) > terminal.height:
-            lines = lines[:h_start] + lines[h_slice_start : h_slice_end] + lines[-h_end:]
+            self._h_position = max(0, min(self._h_position + h_change, len(lines) - h_start - h_end - h_size))
+            h_slice_start = h_start + self._h_position
+            h_slice_end = h_slice_start + h_size
+            if len(lines) > terminal.height:
+                lines = lines[:h_start] + lines[h_slice_start : h_slice_end] + lines[-h_end:]
 
         # Placeholder for empty table
         if not table:
