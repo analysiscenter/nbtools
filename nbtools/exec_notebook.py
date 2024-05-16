@@ -62,8 +62,8 @@ def run_in_process(func):
 def get_exec_notebook_name(pid):
     """ Get the notebook name by its pid.
 
-    Under the hood, the function checks the /tmp/ directory for logs of running `exec_notebook` executors and extract the
-    name for the provided pid.
+    Under the hood, the function checks the /tmp/ directory for logs of running `exec_notebook` executors and extract
+    the name for the provided pid.
     """
     json_path = f'{TMP_DIR}/{pid}.json'
     if not os.path.exists(json_path):
@@ -466,6 +466,7 @@ def save_notebook(notebook, out_path_ipynb, display_link):
         nbformat.write(notebook, file)
 
     if display_link:
+        print('Executed notebook link:')
         display(FileLink(out_path_ipynb))
 
 def notebook_to_html(notebook, out_path_html, display_link):
@@ -480,6 +481,7 @@ def notebook_to_html(notebook, out_path_html, display_link):
         f.write(body)
 
     if display_link:
+        print('Executed notebook link:')
         display(FileLink(out_path_html))
 
 
@@ -514,3 +516,6 @@ def extract_traceback(notebook):
                 return True, cell['execution_count'], traceback
 
     return False, None, ""
+
+# Aliases
+run_notebook = exec_notebook
