@@ -69,9 +69,12 @@ Options are separated into four sections:
 ## Keystrokes
 While in the `watch` mode, you can use keystrokes to change the displayed view:
 * `tab` — swaps views, from `nbwatch` to `devicewatch` and back.
+* `v` — changes verbosity of the displayed table.
 * `b` — toggles bar representation for some of the resources: in addition to its value, show colored bar.
 * `m` — toggles moving average column for some of the resources: values are averaged across the latest iterations.
 * `s` — toggles table separators.
+* `F1-F8` — toggles columns with resources.
+* `r` — resets the behaviour to the defaults.
 
 ## Sort
 The **nbstat** table is sorted in the following way:
@@ -87,8 +90,12 @@ The **nbstat** table is sorted in the following way:
 Using plain **nbwatch** is enough to monitor your usual ML applications. In some situations, though, following snippets are helpful:
 
 * `nbstat .*.ipynb` — to show only Jupyter Notebooks.
+* `nbstat .*/research/.*.ipynb` — to show only Jupyter Notebooks in a specific directory.
+* `nbstat --show status cpu -i 0.1` — additionally displays process status and CPU usage at an increased frequency.
+* `nbstat --hide type pid rss` — display only the GPU-related columns for each process.
 * `nbstat -v`, `nbstat -V` is immensely helpful for `multiprocessing`-related debugging.
     * Adding `--show pid ppid` can be nice to navigate through large number of processes.
+* `nbstat --device-memory-format GB` — show GPU memory in GB: an increasingly more used option when using larger devices.
 
 ## Using as a Python library
 Sometimes, it is desired to get **nbstat** / **devicestat** information as a Python object to parse it manually. You can learn how to do it in the [tutorial](../../tutorials/NBstat.ipynb).

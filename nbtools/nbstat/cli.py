@@ -6,7 +6,7 @@ import sys
 import traceback
 from inspect import cleandoc
 from time import time
-from argparse import ArgumentParser, RawTextHelpFormatter
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
 from blessed import Terminal
 
@@ -84,15 +84,16 @@ def output_looped(inspector, name, formatter, view_args,
                     view_args['h_change'] = 0
 
                     # Select starting position: if needed, redraw the entire screen, otherwise just move cursor position
-                    if abs(current_len - prev_len) > 100 or force_clear:
+                    if abs(current_len - prev_len) > 100 or force_clear or (counter % 100 == 0):
                         start_position = terminal.clear
                         force_clear = False
+                        counter = 0
                     else:
                         start_position = terminal.move(0, 0)
                     prev_len = current_len
 
                     # Actual print
-                    print(start_position, view, ' ', terminal.clear_eol, sep='')
+                    print(start_position, view, sep='', end='', flush=True)
 
                     # Wait for the input key
                     remaining_time = interval - (time() - start_time)
@@ -175,8 +176,6 @@ def output_looped(inspector, name, formatter, view_args,
 
                         if recognized:
                             force_clear = True
-                            # view = inspector.get_view(name=name, formatter=formatter, **view_args)
-                            # print(terminal.clear, view, ' ', terminal.clear_eol, sep='')
                         else:
                             print(f'\nUnrecognized key={inkey}, code={inkey.code}.')
 
@@ -279,19 +278,15 @@ def make_parameters(name):
     docstring = cleandoc(globals()[name].__doc__)
     help_verbose_0 = 'Default `verbose=0` shows only script/notebooks that use devices.' if 'nb' in name else ''
     help_watch = '\nSet `interval` to continuously update displayed table.' if 'watch' not in name else '\n'
-    help_keystrokes = (
-        'While in the `watch` mode, you can use keystrokes to modify displayed view:'
-        '\n  - `tab` — swaps views, from `nbwatch` to `devicewatch` and back.'
-        '\n  - `b` — toggles bar representation for some of the resources: in addition to its value, show colored bar.'
-        '\n  - `m` — toggles moving averages for some of the resources: values are averaged across the last iterations.'
-        '\n  - `s` — toggles table separators.')
+    help_keystrokes = ('While in the `watch` mode, you can use keystrokes to modify the displayed view. '
+                       'Hit `h` to toggle help.')
     parser = ArgumentParser(description='\n'.join([docstring, help_verbose_0, help_watch, help_keystrokes]),
-                            formatter_class=RawTextHelpFormatter)
+                            formatter_class=RawDescriptionHelpFormatter)
     linesep = '\n '
 
     # Positional argument: filtering condition on index
     parser.add_argument('index_condition', nargs='?',
-                        help=('Regular expression for filtering entries in the table index. '
+                        help=('Regular expression for filtering processes, applited to thier path. '
                               'For example, `.*.ipynb` allows to look only at Jupyter Notebooks.'))
 
     # NB-specific argument: verbosity
@@ -308,7 +303,7 @@ def make_parameters(name):
     else:
         help_interval = ('If provided, then the watch mode is used. '
                          'Value sets the interval (in seconds) between table updates.')
-    parser.add_argument('-i', '--interval', '-n', '--watch', nargs='?', type=float, help=help_interval)
+    parser.add_argument('-i', '--interval', nargs='?', type=float, help=help_interval)
 
     help_window = 'Number of table updates to use for computing moving averages.'
     parser.add_argument('-w', '--window', nargs='?', type=int, help=help_window + linesep)
@@ -334,13 +329,17 @@ def make_parameters(name):
 
     if 'watch' in name:
         parser.add_argument('--hide-footnote', action='store_const', const=False, dest='add_footnote',
-                            help=f'By default, we show a row with total resource usage. {help_changeable}{linesep}')
+                            help=f'By default, we show info about resource usage. {help_changeable}{linesep}')
+        parser.add_argument('--hide-help', action='store_const', const=False, dest='add_help',
+                            help=f'By default, we show valid key strokes. {help_changeable}{linesep}')
     else:
         parser.add_argument('--show-footnote', action='store_const', const=True, dest='add_footnote',
-                            help=f'Show a row with total system resource usage. {linesep}')
+                            help=f'Show info about resource usage. {linesep}')
+        parser.add_argument('--show-help', action='store_const', const=True, dest='add_footnote',
+                            help=f'Show valid key strokes. {linesep}')
 
     parser.add_argument('--process-memory-format', type=str, default='GB',
-                        help='Units of measurements for non-device memory stats, `GB` by default.')
+                        help='Units of measurements for non-device memory stats like RSS, `GB` by default.')
     parser.add_argument('--device-memory-format', type=str,
                         help='Units of measurements for device memory stats, `MB` by default.' + linesep)
 
@@ -361,7 +360,7 @@ def make_parameters(name):
     # Update
     separators = args.pop('separators')
     if separators is not None:
-        for key in ['separate_header', 'separate_index']:
+        for key in ['separate_header', 'separate_index', 'separate_footnote']:
             args[key] = separators
 
     if args.pop('hide_all'):
