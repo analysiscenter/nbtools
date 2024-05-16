@@ -67,10 +67,11 @@ def output_looped(inspector, name, formatter, view_args,
     initial_view_args = dict(view_args)
     initial_other_view_args = dict(other_view_args)
 
-    with terminal.cbreak(), terminal.fullscreen():
+    with terminal.fullscreen(), terminal.cbreak(), terminal.hidden_cursor():
         try: # catches keyboard interrupts to exit gracefully
             counter = 0
             prev_len = 0
+            force_clear = False
 
             while True:
                 counter += 1
@@ -80,10 +81,12 @@ def output_looped(inspector, name, formatter, view_args,
                     start_time = time()
                     view = inspector.get_view(name=name, formatter=formatter, **view_args)
                     current_len = true_len(view)
+                    view_args['h_change'] = 0
 
                     # Select starting position: if needed, redraw the entire screen, otherwise just move cursor position
-                    if abs(current_len - prev_len) > 100:
+                    if abs(current_len - prev_len) > 100 or force_clear:
                         start_position = terminal.clear
+                        force_clear = False
                     else:
                         start_position = terminal.move(0, 0)
                     prev_len = current_len
@@ -109,6 +112,9 @@ def output_looped(inspector, name, formatter, view_args,
                             view_args, other_view_args = other_view_args, view_args
                             initial_view_args, initial_other_view_args = initial_other_view_args, initial_view_args
 
+                        elif inkey == 'h':
+                            view_args['add_help'] = not view_args['add_help']
+
                         elif inkey == 's':
                             view_args['separate_index'] = not view_args['separate_index']
                         elif inkey == 'r':
@@ -118,26 +124,66 @@ def output_looped(inspector, name, formatter, view_args,
                         elif inkey == 'm':
                             if formatter[Resource.DEVICE_UTIL]:
                                 formatter[Resource.DEVICE_UTIL_MA] = not formatter[Resource.DEVICE_UTIL_MA]
-                        elif inkey.code == 265:
+                        elif inkey == 'v':
+                            view_args['verbose'] = (view_args['verbose'] + 1) % 3
+
+                        elif inkey.code == terminal.KEY_F1:
                             formatter[Resource.PID] = not formatter[Resource.PID]
-                        elif inkey.code == 266:
+                        elif inkey.code == terminal.KEY_F2:
+                            formatter[Resource.PPID] = not formatter[Resource.PPID]
+                        elif inkey.code == terminal.KEY_F3:
                             formatter[Resource.CPU] = not formatter[Resource.CPU]
-                        elif inkey.code == 267:
-                            formatter[Resource.TYPE] = not formatter[Resource.TYPE]
+                        elif inkey.code == terminal.KEY_F4:
+                            formatter[Resource.RSS] = not formatter[Resource.RSS]
+
+                        elif inkey.code == terminal.KEY_F5:
+                            if Resource.DEVICE_SHORT_ID in formatter:
+                                formatter[Resource.DEVICE_SHORT_ID] = not formatter[Resource.DEVICE_SHORT_ID]
+                            if Resource.DEVICE_ID in formatter:
+                                formatter[Resource.DEVICE_ID] = not formatter[Resource.DEVICE_ID]
+                        elif inkey.code == terminal.KEY_F6:
+                            formatter[Resource.DEVICE_PROCESS_MEMORY_USED] = \
+                                not formatter[Resource.DEVICE_PROCESS_MEMORY_USED]
+                        elif inkey.code == terminal.KEY_F7:
+                            formatter[Resource.DEVICE_UTIL] = not formatter[Resource.DEVICE_UTIL]
+                        elif inkey.code == terminal.KEY_F8:
+                            formatter[Resource.DEVICE_TEMP] = not formatter[Resource.DEVICE_TEMP]
+
+                        # elif inkey.code == terminal.KEY_F9:
+                        #     formatter[Resource.TYPE] = not formatter[Resource.TYPE]
+                        #     print(formatter['type'])
+                        # elif inkey.code == terminal.KEY_F10:
+                        #     formatter[Resource.STATUS] = not formatter[Resource.STATUS]
+                        # elif inkey.code == terminal.KEY_F11:
+                        #     formatter[Resource.DEVICE_TEMP] = not formatter[Resource.DEVICE_TEMP]
+                        # elif inkey.code == terminal.KEY_F12:
+                        #     formatter[Resource.DEVICE_TEMP] = not formatter[Resource.DEVICE_TEMP]
+
+                        elif inkey.code == terminal.KEY_DOWN:
+                            view_args['h_change'] = +1
+                        elif inkey.code == terminal.KEY_UP:
+                            view_args['h_change'] = -1
+                        elif inkey.code == terminal.KEY_PGDOWN:
+                            view_args['h_change'] = +terminal.height // 2
+                        elif inkey.code == terminal.KEY_PGUP:
+                            view_args['h_change'] = -terminal.height // 2
+
                         elif inkey == 'q':
                             raise KeyboardInterrupt
                         else:
                             recognized = False
 
                         if recognized:
-                            view = inspector.get_view(name=name, formatter=formatter, **view_args)
-                            print(terminal.clear, view, ' ', terminal.clear_eol, sep='')
+                            force_clear = True
+                            # view = inspector.get_view(name=name, formatter=formatter, **view_args)
+                            # print(terminal.clear, view, ' ', terminal.clear_eol, sep='')
                         else:
-                            print(f'Unrecognized key={inkey}, code={inkey.code}.')
+                            print(f'\nUnrecognized key={inkey}, code={inkey.code}.')
 
-                except Exception: # pylint: disable=broad-except
+                except Exception as e: # pylint: disable=broad-except
                     sys.stderr.write(traceback.format_exc())
                     sys.stderr.write('Error on getting system information!')
+                    sys.stderr.write(str(e))
                     sys.exit(1)
 
         except KeyboardInterrupt:
@@ -192,11 +238,13 @@ DEFAULTS = {
     'hide' : [],
     'hide_similar' : True,
 
-    'add_supheader' : True,
     'add_header' : True,
     'add_footnote' : False,
+    'add_help': False,
 
-    'separate_supheader' : False,
+    'use_cache': False,
+    'h_change': 0,
+
     'separate_header' : True,
     'separate_index' : True,
 
@@ -215,7 +263,7 @@ def make_parameters(name):
         defaults.update({'separate_index' : False,})
 
     if 'watch' in name:
-        defaults.update({'add_footnote' : True})
+        defaults.update({'use_cache': True, 'add_footnote' : True, 'add_help': True})
 
     # Fetch formatter: used to tell which columns can be shown/hidden from the table in documentation
     view = NAME_TO_VIEW[name]
@@ -281,8 +329,6 @@ def make_parameters(name):
     help_hidable = f'By default, parts of rows with the same values as in previous row are hidden. {help_changeable}'
     parser.add_argument('--show-similar', action='store_const', const=False, dest='hide_similar', help=help_hidable)
 
-    parser.add_argument('--hide-supheader', action='store_const', const=False, dest='add_supheader',
-                        help=f'By default, we show current time, driver and CUDA versions. {help_changeable}')
     parser.add_argument('--hide-header', action='store_const', const=False, dest='add_header',
                         help=f'By default, we show a row with column names in the table. {help_changeable}')
 
@@ -315,7 +361,7 @@ def make_parameters(name):
     # Update
     separators = args.pop('separators')
     if separators is not None:
-        for key in ['separate_supheader', 'separate_header', 'separate_index']:
+        for key in ['separate_header', 'separate_index']:
             args[key] = separators
 
     if args.pop('hide_all'):
