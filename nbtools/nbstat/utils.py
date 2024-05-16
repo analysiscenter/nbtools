@@ -89,7 +89,7 @@ class FiniteList(list):
         Returns `None`, if there are less than `size // 2` elements in the list.
         """
         size = size or self.size
-        if len(self) > size // 2:
+        if len(self) > 1:
             sublist = self[-size:]
             return round(sum(sublist) / len(sublist))
         return None

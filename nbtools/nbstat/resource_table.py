@@ -508,7 +508,18 @@ class ResourceTable:
             else:
                 separator_indices = separator_indices[1:][::-1]
 
-            separator = terminal.separator_symbol * terminal.length(lines[0])
+            # separator = terminal.separator_symbol * terminal.length(lines[0])
+
+            l0 = terminal.rjust(terminal.strip(lines[0]), terminal.length(lines[0]))
+            separator = []
+            start, jdx = 0, l0.find('┃')
+            while jdx != -1:
+                separator.append(terminal.separator_symbol * terminal.length(l0[start:jdx]))
+                start = jdx + 1
+                jdx = l0.find('┃', start)
+            separator.append(terminal.separator_symbol * terminal.length(l0[start:]))
+            separator = '┃'.join(separator)
+
             for idx in separator_indices:
                 lines.insert(idx, separator)
 

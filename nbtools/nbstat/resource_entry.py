@@ -56,13 +56,13 @@ class ResourceEntry(dict):
                     data = '~' + data.split('/')[-1]
                 if len(data) >= 60:
                     data = data.replace('.ipynb', '').replace('.py', '')
-                    data = data[:30] + '[...]' + data[-30]
+                    data = data[:30] + '[...]'
 
         elif resource == Resource.TYPE:
             if data is not None:
                 if 'zombie' in data or 'containerd' in data:
                     style = terminal.red
-                if 'run_notebook' in data:
+                if data == 'run_notebook':
                     style = terminal.green
 
         elif resource == Resource.CREATE_TIME:
@@ -112,9 +112,9 @@ class ResourceEntry(dict):
                 total, unit = format_memory(self[Resource.DEVICE_MEMORY_TOTAL], format=memory_format)
 
                 n_digits = len(str(total))
-                string = (f'{terminal.normal + terminal.yellow}{style}{used:>{n_digits}}'
+                string = (f'{terminal.normal + terminal.gold2}{style}{used:>{n_digits}}'
                           f'{terminal.normal + terminal.bold} / '
-                          f'{terminal.normal + terminal.yellow}{style}{total} '
+                          f'{terminal.normal + terminal.gold2}{style}{total} '
                           f'{terminal.normal + terminal.bold}{unit}')
 
         elif resource == Resource.DEVICE_PROCESS_MEMORY_USED:
@@ -127,11 +127,11 @@ class ResourceEntry(dict):
                 total, _ = format_memory(self[Resource.DEVICE_MEMORY_TOTAL], format=memory_format)
 
                 n_digits = len(str(total))
-                string = (f'{terminal.normal + terminal.yellow}{style}{used_process:>{n_digits}}'
+                string = (f'{terminal.normal + terminal.gold2}{style}{used_process:>{n_digits}}'
                           f'{terminal.normal + terminal.bold} / '
-                          f'{terminal.normal + terminal.yellow}{style}{max(used_device, used_process):>{n_digits}}'
+                          f'{terminal.normal + terminal.gold2}{style}{max(used_device, used_process):>{n_digits}}'
                           f'{terminal.normal + terminal.bold} / '
-                          f'{terminal.normal + terminal.yellow}{style}{total} '
+                          f'{terminal.normal + terminal.gold2}{style}{total} '
                           f'{terminal.normal + terminal.bold}{unit}')
             else:
                 # Fallback to total device memory usage, if possible
@@ -176,7 +176,7 @@ class ResourceEntry(dict):
         elif resource == Resource.TABLE_DELIMITER1:
             string = '┃'
         elif resource == Resource.TABLE_DELIMITER2:
-            string = '║'
+            string = '┃┃'
 
         # Default values
         if style is None:

@@ -39,7 +39,7 @@ def run_in_process(func):
 
             output = _output_queue.get()
             process.join()
-        except Exception as e:
+        except (Exception, KeyboardInterrupt) as e:
             output = {'failed': True, 'traceback': e}
 
             # Terminate all relevant processes when something went wrong, e.g. Keyboard Interrupt

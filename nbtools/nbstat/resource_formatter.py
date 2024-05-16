@@ -50,11 +50,14 @@ class ResourceFormatter(list):
 
     def __contains__(self, key):
         """ Overloaded `in` operator. """
-        try:
-            _ = self[key]
-            return True
-        except KeyError:
+        if isinstance(key, Resource):
+            for entry in self:
+                if entry['resource'] is key:
+                    return True
             return False
+        if isinstance(key, str):
+            return Resource.parse_alias(key) in self
+        return False
 
     def __setitem__(self, key, value):
         """ If `key` is a resource (or an alias), set the values of `include` flag for this resource. """
