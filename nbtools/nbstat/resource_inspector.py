@@ -12,7 +12,7 @@ import nvidia_smi
 
 from .resource import Resource
 from .resource_table import ResourceTable
-from .utils import format_memory, pid_to_name, pid_to_ngid, FiniteList
+from .utils import format_memory, pid_to_name, pid_to_ngid, FiniteList, true_len, true_rjust, true_center
 from ..run_notebook import get_run_notebook_name
 
 
@@ -620,13 +620,14 @@ class ResourceInspector:
     def make_terminal(self, force_styling, separator):
         """ Create terminal instance. """
         terminal = Terminal(kind=os.getenv('TERM'), force_styling=force_styling if force_styling else None)
-        terminal.separator_symbol = terminal.bold + separator + terminal.normal
+        terminal.separator_symbol = terminal.bold + separator
         terminal._normal = '\x1b[0;10m' # pylint: disable=protected-access
 
-        # Change some methods to a faster versions. TODO: better measurements and tests
-        # terminal.length = true_len
-        # terminal.rjust = true_rjust
-        # terminal.center = true_center
+        # Change some methods to a faster versions
+        # TODO: better measurements and tests for the same outputs
+        terminal.length = true_len
+        terminal.rjust = true_rjust
+        terminal.center = true_center
         return terminal
 
     def add_line(self, lines, parts, terminal, position, separator_position, underline, bold):

@@ -150,6 +150,8 @@ def output_looped(inspector, name, formatter, view_args,
                         elif inkey.code == terminal.KEY_F8:
                             formatter[Resource.DEVICE_TEMP] = not formatter[Resource.DEVICE_TEMP]
 
+                        # TODO: add more keystrokes for columns
+                        # F9-F12 are hard to use because they are intercepted by terminal / web browser
                         # elif inkey.code == terminal.KEY_F9:
                         #     formatter[Resource.TYPE] = not formatter[Resource.TYPE]
                         #     print(formatter['type'])
@@ -262,7 +264,7 @@ def make_parameters(name):
         defaults.update({'separate_index' : False,})
 
     if 'watch' in name:
-        defaults.update({'use_cache': True, 'add_footnote' : True, 'add_help': True})
+        defaults.update({'use_cache': True, 'add_footnote': True, 'add_help': True})
 
     # Fetch formatter: used to tell which columns can be shown/hidden from the table in documentation
     view = NAME_TO_VIEW[name]

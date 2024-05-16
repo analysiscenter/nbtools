@@ -518,7 +518,7 @@ class ResourceTable:
                 start = jdx + 1
                 jdx = l0.find('┃', start)
             separator.append(terminal.separator_symbol * terminal.length(l0[start:]))
-            separator = '┃'.join(separator)
+            separator = '┃'.join(separator) + terminal.normal
 
             for idx in separator_indices:
                 lines.insert(idx, separator)
