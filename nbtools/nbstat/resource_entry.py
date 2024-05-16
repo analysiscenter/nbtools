@@ -62,7 +62,7 @@ class ResourceEntry(dict):
             if data is not None:
                 if 'zombie' in data or 'containerd' in data:
                     style = terminal.red
-                if data == 'run_notebook':
+                if data == 'exec_notebook':
                     style = terminal.green
 
         elif resource == Resource.CREATE_TIME:

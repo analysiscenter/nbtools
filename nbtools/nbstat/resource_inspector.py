@@ -13,7 +13,7 @@ import nvidia_smi
 from .resource import Resource
 from .resource_table import ResourceTable
 from .utils import format_memory, pid_to_name, pid_to_ngid, FiniteList, true_len, true_rjust, true_center
-from ..run_notebook import get_run_notebook_name
+from ..exec_notebook import get_exec_notebook_name
 
 
 
@@ -253,7 +253,7 @@ class ResourceInspector:
                     kernel_id = KERNEL_ID_SEARCHER(cmdline)
                     vscode_key = VSCODE_KEY_SEARCHER(cmdline)
                     script_name = SCRIPT_NAME_SEARCHER(cmdline)
-                    run_notebook_path = RUN_NOTEBOOK_PATH_SEARCHER(cmdline)
+                    exec_notebook_path = RUN_NOTEBOOK_PATH_SEARCHER(cmdline)
 
                     if kernel_id:
                         # The name will be changed by data from `notebook_table`.
@@ -267,9 +267,9 @@ class ResourceInspector:
                         type_ = 'vscode'
                         name = vscode_key.group(1).split('-')[0] + '.ipynb'
                         path = kernel_id = vscode_key.group(1)
-                    elif run_notebook_path:
-                        type_ = 'run_notebook'
-                        name = get_run_notebook_name(process.ppid())
+                    elif exec_notebook_path:
+                        type_ = 'exec_notebook'
+                        name = get_exec_notebook_name(process.ppid())
                         path = os.path.join(cwd, name)
                         kernel_id = None
                     elif script_name:
@@ -285,8 +285,8 @@ class ResourceInspector:
 
                     # PYTHON_PPID = PPID if parent is Python process else -1
                     ppid = process.ppid()
-                    if type_ == 'run_notebook':
-                        # Spawned by `run_notebook` function of the library
+                    if type_ == 'exec_notebook':
+                        # Spawned by `exec_notebook` function of the library
                         python_ppid = ppid
                     elif ppid in python_pids:
                         # Spawned by one of other Python processes
