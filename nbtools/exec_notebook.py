@@ -10,13 +10,13 @@ from multiprocessing import Process, Queue
 import psutil
 
 
-TMP_DIR = '/tmp/nbtools_run_notebook'
+TMP_DIR = '/tmp/nbtools_exec_notebook'
 os.makedirs(TMP_DIR, exist_ok=True)
 
 
 # Decorator
 def run_in_process(func):
-    """ Decorator to run the `func` in a separated process for terminating all relevant processes properly. """
+    """ Decorator to run the `func` in a separate process for terminating all related processes properly. """
     @wraps(func)
     def _wrapper(*args, **kwargs):
         # pylint: disable=broad-exception-caught, broad-exception-raised
@@ -39,7 +39,7 @@ def run_in_process(func):
 
             output = _output_queue.get()
             process.join()
-        except (Exception, KeyboardInterrupt) as e:
+        except (KeyboardInterrupt, Exception) as e:
             output = {'failed': True, 'traceback': e}
 
             # Terminate all relevant processes when something went wrong, e.g. Keyboard Interrupt
@@ -59,19 +59,22 @@ def run_in_process(func):
         return output
     return _wrapper
 
-def get_run_notebook_name(pid):
-    """ Check /tmp/ directory for logs of running `run_notebook` executors and extract name for a given pid. """
+def get_exec_notebook_name(pid):
+    """ Get the notebook name by its pid.
+
+    Under the hood, the function checks the /tmp/ directory for logs of running `exec_notebook` executors and extract the
+    name for the provided pid.
+    """
     json_path = f'{TMP_DIR}/{pid}.json'
     if not os.path.exists(json_path):
-        return 'run_notebook'
+        return 'exec_notebook'
     with open(json_path, 'r', encoding='utf-8') as file:
         path = json.load(file)['path']
     return path.split('/')[-1]
 
 
 
-# Code cells for insertion
-# Code fragments that are inserted in the notebook
+# Code fragments that are inserted as additional cells in a notebook
 CELL_INSERT_COMMENT = "# Cell inserted during automated execution"
 
 # Connect to a shelve database for inputs/outputs providing
@@ -134,68 +137,79 @@ OUTPUTS_DISPLAY = dedent(OUTPUTS_DISPLAY)
 
 # Main functions
 @run_in_process
-def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_pos=False,
-                 working_dir = './', execute_kwargs=None,
-                 out_path_db=None, out_path_ipynb=None, out_path_html=None, remove_db='always', add_timestamp=True,
-                 hide_code_cells=False, mask_extra_code=False, display_links=True,
-                 raise_exception=False, return_notebook=False, _output_queue=None):
+def exec_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_pos=False,
+                  display_inputs=False, display_outputs=False,
+                  working_dir = './', execute_kwargs=None,
+                  out_path_db=None, out_path_ipynb=None, out_path_html=None, remove_db='always',
+                  add_timestamp=True, hide_code_cells=False, display_links=True,
+                  raise_exception=False, return_notebook=False, _output_queue=None):
     """ Execute a Jupyter Notebook programmatically.
     Heavily inspired by https://github.com/tritemio/nbrun.
 
     Intended to be an analog of `exec`, providing a way to inject / extract variables from the execution.
-    Executed notebook is optionally saved to disk as `.ipynb`/`.html`: we strongly recommend always doing that.
     For a detailed description of how to do that, check the `inputs` and `outputs` parameters.
+    The executed notebook is optionally saved to disk as `.ipynb` / `.html` file: we strongly recommend always doing so.
 
-    Flag `raise_exception` defines behavior if the execution of the notebook is failed due to an exception.
+    The `raise_exception` flag defines the behavior if the execution of the notebook fails due to an exception.
 
     Under the hood, this function does the following:
         - Create an internal database to communicate variables (both `inputs` and `outputs`). Save `inputs` to it.
-        - Add a cell with reading `inputs` from the database, add a cell for saving `outputs` to the database.
+        - Add a cell for reading `inputs` from the internal database, add a cell for saving `outputs` to it.
         - Execute notebook.
         - Handle exceptions.
         - Read `outputs` from the database.
         - Add a timestamp cell to the notebook, if needed.
-        - Save the executed notebook as `.ipynb` and/or `.html`.
+        - Save the executed notebook as `.ipynb` and / or `.html`.
         - Return a dictionary with intermediate results, execution info and values of `outputs` variables.
 
-    If there are no `inputs` nor `outputs`, a database is not created and additional cells are not inserted.
-    If either of them is provided, then one of `out_path_ipynb` or `out_path_db` must be explicitly defined.
+    If there are no `inputs` or `outputs`, a database is not created and additional cells are not inserted.
+    Note, if either of them is provided, then one of `out_path_ipynb` or `out_path_db` must be explicitly defined.
 
     Parameters
     ----------
     path : str
         Path to the notebook to execute.
     inputs : dict, optional
-        Inputs for notebook execution: essentially, its `globals`.
+        Inputs for execution are essentially equivalent to notebook `globals`.
         Must be a dictionary with variable names and their values; therefore, keys must be valid Python identifiers.
-        Saved to a database, loaded in the notebook in a separate cell, that is inserted at `inputs_pos` position.
-        Therefore, values must be serializable.
+        Under the hood, inputs are saved into a database, loaded in the notebook in a separate cell, that is inserted at
+        the `inputs_pos` position. Therefore, values must be serializable.
     outputs : str or iterable of str, optional
-        List of notebook local variable names to return.
-        Extracted from the notebook in a separate cell, that is inserted at the last position.
-        If some of the variables don't exist, no errors are raised.
+        The list of variable names to return from the notebook.
+        Extracted from the notebook in a separate cell, which is inserted at the last position.
+        Note, if some of the variables don't exist, no errors are raised.
     inputs_pos : int, optional
         Position to insert the cell with `inputs` loading into the notebook.
     replace_inputs_pos : int, optional
         Whether to replace `inputs_pos` code cell with `inputs` or insert a new one.
+    display_inputs : bool, optional
+        Whether to display `inputs` or not.
+        Under the hood, inputs are provided using a shelve database. If `display_inputs=True`, variables will be
+        inserted in the cell in the following manner: `input_name = input_value`, instead of importing code from shelve.
+        For more, see the :func:`~._display_inputs_reading` docstring.
+    display_outputs : bool, optional
+        Whether to display `outputs` or not.
+        Under the hood, outputs are saved using a shelve database. If `display_outputs=True`, variables will be shown in
+        the last cell in the following manner: `print(input_name)`, instead of dumping code into the database.
+        For more, see the :func:`~._display_outputs_dumping` docstring.
     working_dir : str
         The working directory of starting the kernel.
     out_path_db : str, optional
-        Path to save shelve database files without file extension.
+        Path to save the internal database files (without file extension).
         If not provided, then it is inferred from `out_path_ipynb`.
     out_path_ipynb : str, optional
         Path to save the output ipynb file.
     out_path_html : str, optional
         Path to save the output html file.
     remove_db : str, optional
-        Whether to remove shelve database after notebook execution.
+        Whether to remove the internal database after notebook execution.
         Possible options are: 'always', 'not_failed_case' or 'never'.
         If 'always', then remove the database after notebook execution.
         If 'not_failed_case', then remove the database if there wasn't any execution failure.
         If 'never', then don't remove the database after notebook execution.
-        Running `:meth:run_notebook` with 'not_failed_case' or 'never' option helps to reproduce failures
-        in the `out_path_ipynb` notebook: it will take passed inputs from the saved shelve database.
-        Note, that database exists only if inputs and/or outputs are provided.
+        Running `:func:exec_notebook` with the 'not_failed_case' or 'never' option helps to reproduce failures
+        in the `out_path_ipynb` notebook: it will take the inputs from the saved shelve database.
+        Note, that the database exists only if inputs and / or outputs are provided.
     execute_kwargs : dict, optional
         Parameters of `:class:ExecutePreprocessor`.
         For example, you can provide timeout, kernel_name, resources (such as metadata)
@@ -205,9 +219,6 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
         Whether to add a cell with execution information at the beginning of the saved notebook.
     hide_code_cells : bool, optional
         Whether to hide the code cells in the saved notebook.
-    mask_extra_code : bool, optional
-        Whether to mask database reading and dumping code.
-        For more, see :func:`~.mask_inputs_reading` and :func`~.mask_outputs_dumping` docstrings.
     display_links : bool, optional
         Whether to display links to the executed notebook and html at execution.
     raise_exception : bool, optional
@@ -221,7 +232,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
     -------
     exec_res : dict
         Dictionary with the notebook execution results.
-        It provides next information:
+        It provides the following information:
         - 'failed' : bool
            Whether the notebook execution failed.
         - 'outputs' : dict
@@ -276,9 +287,6 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
     with open(path, encoding='utf-8') as file:
         notebook = nbformat.read(file, as_version=4)
 
-    if hide_code_cells:
-        notebook["metadata"].update({"hide_input": True})
-
     if inputs is not None:
         # Save `inputs` in the shelve database and create a cell in the notebook
         # for parameters extraction
@@ -286,7 +294,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
             notebook_db.update(inputs)
 
         code = CELL_INSERT_COMMENT + DB_CONNECT_CODE_CELL.format(repr(working_dir_out_path_db)) + INPUTS_CODE_CELL
-        if mask_extra_code:
+        if display_inputs:
             code += INPUTS_DISPLAY
 
         if replace_inputs_pos:
@@ -303,7 +311,7 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
                (DB_CONNECT_CODE_CELL.format(repr(working_dir_out_path_db)) if not inputs else "") + \
                OUTPUTS_CODE_CELL.format(outputs)
 
-        if mask_extra_code:
+        if display_outputs:
             code += OUTPUTS_DISPLAY
 
         output_cell = nbformat.v4.new_code_cell(code)
@@ -367,14 +375,18 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
             timestamp_cell = nbformat.v4.new_markdown_cell(timestamp)
             notebook['cells'].insert(0, timestamp_cell)
 
-        if mask_extra_code:
-            if inputs is not None:
-                pos = inputs_pos + 1 if add_timestamp else inputs_pos
-                mask_inputs_reading(notebook=notebook, pos=pos)
+        if display_inputs and inputs is not None:
+            pos = inputs_pos + 1 if add_timestamp else inputs_pos
+            _display_inputs_reading(notebook=notebook, pos=pos)
 
-            if outputs is not None:
-                pos = len(notebook['cells']) - 1
-                mask_outputs_dumping(notebook=notebook, pos=pos)
+        if display_outputs and outputs is not None:
+            pos = len(notebook['cells']) - 1
+            _display_outputs_dumping(notebook=notebook, pos=pos)
+
+        if hide_code_cells:
+            for cell in notebook['cells']:
+                if cell['cell_type'] == 'code':
+                    cell["metadata"].update({"jupyter": {"source_hidden": "true"}})
 
         # Save the executed notebook/HTML to disk
         if out_path_ipynb is not None:
@@ -388,9 +400,9 @@ def run_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_p
         _output_queue.put(exec_res) # return for parent process
     return None
 
-# Mask functions for database operations cells
-def mask_inputs_reading(notebook, pos):
-    """ Replace database reading by variables initialization.
+# Functions for database operations cells masking
+def _display_inputs_reading(notebook, pos):
+    """ Replace database reading code by variables initialization mask.
 
     Result is a code cell with the following view:
     .. code-block:: python
@@ -408,8 +420,8 @@ def mask_inputs_reading(notebook, pos):
     cell_mask = nbformat.v4.new_code_cell(source=code_mask, execution_count=execution_count)
     notebook['cells'][pos] = cell_mask
 
-def mask_outputs_dumping(notebook, pos):
-    """Replace database dumping by printing outputs.
+def _display_outputs_dumping(notebook, pos):
+    """ Replace database dumping code by printing outputs.
 
     Result is a code cell with the following view and corresponding output:
     .. code-block:: python
@@ -436,7 +448,9 @@ def mask_outputs_dumping(notebook, pos):
             code_mask += f'print({variable_name})\n'
             text_mask += variable_value
 
-    outputs_mask =  [nbformat.v4.new_output(text=text_mask, name='stdout', output_type='stream')]
+    code_mask = code_mask[:-1] # remove extra '\n'
+
+    outputs_mask =  [nbformat.v4.new_output(text=text_mask[1:], name='stdout', output_type='stream')]
 
     cell_mask = nbformat.v4.new_code_cell(source=code_mask, execution_count=execution_count, outputs=outputs_mask)
     notebook['cells'][pos] = cell_mask
