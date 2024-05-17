@@ -438,6 +438,7 @@ class ResourceTable:
                   'device_memory_format' : device_memory_format}
 
         lines = [[] for _ in range(1 + len(self))]
+        widths = []
         for column_dict in formatter.included_only:
             # Retrieve parameters of the column display
             resource = column_dict['resource']
@@ -491,6 +492,7 @@ class ResourceTable:
 
             for line, string in zip(lines, strings):
                 line.append(string)
+            widths.append(width)
 
         lines = [terminal.normal + ' '.join(line).rstrip() + terminal.normal for line in lines]
 
@@ -501,15 +503,17 @@ class ResourceTable:
                 separator_indices.append(s)
                 s += len(subtable)
 
+            header_idx = None
             if (add_header and separate_header) and separate_index:
                 separator_indices = separator_indices[::-1]
+                header_idx = separator_indices[-1]
             elif add_header and separate_header:
                 separator_indices = separator_indices[:1]
+                header_idx = separator_indices[0]
             else:
                 separator_indices = separator_indices[1:][::-1]
 
-            # separator = terminal.separator_symbol * terminal.length(lines[0])
-
+            # Make a separator: insert delimiters at correct (sequence-wise!) place
             l0 = terminal.rjust(terminal.strip(lines[0]), terminal.length(lines[0]))
             separator = []
             start, jdx = 0, l0.find('┃')
@@ -519,9 +523,11 @@ class ResourceTable:
                 jdx = l0.find('┃', start)
             separator.append(terminal.separator_symbol * terminal.length(l0[start:]))
             separator = '┃'.join(separator)
+            header_separator = separator.replace(terminal.separator_symbol, terminal.bold + '-' + terminal.normal)
 
             for idx in separator_indices:
-                lines.insert(idx, separator)
+                sep = separator if idx != header_idx else header_separator
+                lines.insert(idx, sep)
 
         return lines
 

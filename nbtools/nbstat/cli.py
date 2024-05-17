@@ -66,6 +66,8 @@ def output_looped(inspector, name, formatter, view_args,
 
     initial_view_args = dict(view_args)
     initial_other_view_args = dict(other_view_args)
+    initial_formatter = formatter.copy()
+    initial_other_formatter = other_formatter.copy()
 
     with terminal.fullscreen(), terminal.cbreak(), terminal.hidden_cursor():
         try: # catches keyboard interrupts to exit gracefully
@@ -112,14 +114,23 @@ def output_looped(inspector, name, formatter, view_args,
                             formatter, other_formatter = other_formatter, formatter
                             view_args, other_view_args = other_view_args, view_args
                             initial_view_args, initial_other_view_args = initial_other_view_args, initial_view_args
+                            initial_formatter, initial_other_formatter = initial_other_formatter, initial_formatter
 
+                        # Additional lines. TODO: a separate screen with textual help...?
+                        elif inkey == 'f':
+                            view_args['add_footnote'] = not view_args['add_footnote']
                         elif inkey == 'h':
                             view_args['add_help'] = not view_args['add_help']
 
+                        # General controls
                         elif inkey == 's':
                             view_args['separate_index'] = not view_args['separate_index']
+                        elif inkey == 'S':
+                            view_args['separate_header'] = not view_args['separate_header']
+                            view_args['separate_table'] = not view_args['separate_table']
                         elif inkey == 'r':
                             view_args = dict(initial_view_args)
+                            formatter = initial_formatter.copy()
                         elif inkey == 'b':
                             formatter.toggle_bars()
                         elif inkey == 'm':
@@ -128,6 +139,7 @@ def output_looped(inspector, name, formatter, view_args,
                         elif inkey == 'v':
                             view_args['verbose'] = (view_args['verbose'] + 1) % 3
 
+                        # F1-F4: regular stats
                         elif inkey.code == terminal.KEY_F1:
                             formatter[Resource.PID] = not formatter[Resource.PID]
                         elif inkey.code == terminal.KEY_F2:
@@ -137,6 +149,7 @@ def output_looped(inspector, name, formatter, view_args,
                         elif inkey.code == terminal.KEY_F4:
                             formatter[Resource.RSS] = not formatter[Resource.RSS]
 
+                        # F1-F8: device stats
                         elif inkey.code == terminal.KEY_F5:
                             if Resource.DEVICE_SHORT_ID in formatter:
                                 formatter[Resource.DEVICE_SHORT_ID] = not formatter[Resource.DEVICE_SHORT_ID]
@@ -149,18 +162,7 @@ def output_looped(inspector, name, formatter, view_args,
                             formatter[Resource.DEVICE_UTIL] = not formatter[Resource.DEVICE_UTIL]
                         elif inkey.code == terminal.KEY_F8:
                             formatter[Resource.DEVICE_TEMP] = not formatter[Resource.DEVICE_TEMP]
-
-                        # TODO: add more keystrokes for columns
-                        # F9-F12 are hard to use because they are intercepted by terminal / web browser
-                        # elif inkey.code == terminal.KEY_F9:
-                        #     formatter[Resource.TYPE] = not formatter[Resource.TYPE]
-                        #     print(formatter['type'])
-                        # elif inkey.code == terminal.KEY_F10:
-                        #     formatter[Resource.STATUS] = not formatter[Resource.STATUS]
-                        # elif inkey.code == terminal.KEY_F11:
-                        #     formatter[Resource.DEVICE_TEMP] = not formatter[Resource.DEVICE_TEMP]
-                        # elif inkey.code == terminal.KEY_F12:
-                        #     formatter[Resource.DEVICE_TEMP] = not formatter[Resource.DEVICE_TEMP]
+                        # TODO: add more keystrokes for columns: TYPE, STATUS, PATH
 
                         elif inkey.code == terminal.KEY_DOWN:
                             view_args['h_change'] = +1
@@ -246,8 +248,9 @@ DEFAULTS = {
     'use_cache': False,
     'h_change': 0,
 
-    'separate_header' : True,
-    'separate_index' : True,
+    'separate_header': True,
+    'separate_index': True,
+    'separate_table': True,
 
     'force_styling' : True,
     'process_memory_format' : 'GB',
@@ -288,7 +291,7 @@ def make_parameters(name):
 
     # Positional argument: filtering condition on index
     parser.add_argument('index_condition', nargs='?',
-                        help=('Regular expression for filtering processes, applited to thier path. '
+                        help=('Regular expression for filtering processes, applied to their path. '
                               'For example, `.*.ipynb` allows to look only at Jupyter Notebooks.'))
 
     # NB-specific argument: verbosity

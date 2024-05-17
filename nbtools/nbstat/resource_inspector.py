@@ -507,7 +507,8 @@ class ResourceInspector:
     def get_view(self, name='nbstat', formatter=None, index_condition=None, force_styling=True,
                  sort=True, verbose=0, window=20, interval=None,
                  add_header=True, underline_header=True, bold_header=False, separate_header=True,
-                 add_footnote=False, underline_footnote=False, bold_footnote=True, separate_footnote=True,
+                 separate_table=False,
+                 add_footnote=False, underline_footnote=False, bold_footnote=True,
                  add_help=False, underline_help=False, bold_help=True,
                  use_cache=False,
                  h_change=0,
@@ -561,31 +562,36 @@ class ResourceInspector:
 
         # Make formatted strings
         lines = table.format(terminal=terminal, formatter=formatter,
-                             add_header=add_header, underline_header=underline_header,
-                             bold_header=bold_header, separate_header=separate_header,
+                             add_header=add_header, underline_header=underline_header, bold_header=bold_header,
+                             separate_header=separate_header,
                              separate_index=separate_index, hide_similar=hide_similar,
                              process_memory_format=process_memory_format, device_memory_format=device_memory_format)
 
+        # Additional line elements: separator, footnote, help
+        if separate_table:
+            separator = terminal.bold + '-' * terminal.length(lines[0])
+            lines.append(separator)
+
         if add_footnote:
             lines = self.add_footnote(lines, terminal=terminal,
-                                      underline=underline_footnote, bold=bold_footnote, separate=separate_footnote,
+                                      underline=underline_footnote, bold=bold_footnote,
                                       process_memory_format=process_memory_format)
 
         if add_help:
             lines = self.add_help(lines, terminal=terminal,
                                   underline=underline_help, bold=bold_help)
 
-        # Select visible
+        # Select visible lines: keep header / footnote+help, move just the index items
         if 'watch' in name:
             h_start = int(add_header) + int(separate_header)
-            h_end = 2*int(add_footnote) + int(separate_footnote) + 2*int(add_help)
+            h_end = int(separate_table) + 2*int(add_footnote) + 2*int(add_help)
             h_size = terminal.height - h_start - h_end - 5
 
             self._h_position = max(0, min(self._h_position + h_change, len(lines) - h_start - h_end - h_size))
             h_slice_start = h_start + self._h_position
             h_slice_end = h_slice_start + h_size
             if len(lines) > terminal.height:
-                lines = lines[:h_start] + lines[h_slice_start : h_slice_end] + lines[-h_end:]
+                lines = lines[:h_start] + lines[h_slice_start : h_slice_end] + lines[-(h_end or 1):]
 
         # Placeholder for empty table
         if not table:
@@ -593,7 +599,7 @@ class ResourceInspector:
             placeholder = terminal.rjust(terminal.bold + 'No entries to display!' + terminal.normal, width)
             lines.insert(2, placeholder)
 
-        return '\n'.join(lines)
+        return '\n'.join(lines) + terminal.normal
 
 
     def cache_available(self, name, formatter, verbose, interval):
@@ -654,18 +660,14 @@ class ResourceInspector:
         return lines
 
 
-    def add_footnote(self, lines, terminal, underline=True, bold=True, separate=True, process_memory_format='GB'):
+    def add_footnote(self, lines, terminal, underline=True, bold=True, process_memory_format='GB'):
         """ Add a footnote with info about current CPU, RSS and GPU usage. """
-        if separate:
-            separator = terminal.bold + '-' * terminal.length(lines[0])
-            lines.append(separator)
-
         # N running notebooks, number of used devices
         parts = []
 
         if 'notebook_table' in self._cache:
             n_notebooks = len(self._cache['notebook_table'])
-            parts.append(f'{terminal.pink}N_NOTEBOOKS: {n_notebooks:>3}')
+            parts.append(f'{terminal.pink}# KERNELS: {n_notebooks:>3}')
 
         if 'device_table' in self._cache:
             n_used_devices = sum(bool(entry[Resource.DEVICE_PROCESS_N]) for entry in self._cache['device_table'])
@@ -704,9 +706,10 @@ class ResourceInspector:
             'TAB: SWITCH VIEWS',
             'V: VERBOSITY',
             'S: SEPARATORS',
-            'B: BARS',
+            # 'B: BARS',
             # 'M: MOVING AVGS',
-            'R: RESET'
+            'R: RESET',
+            'Q: QUIT'
         ]
         parts = ['    '.join(parts)]
 
