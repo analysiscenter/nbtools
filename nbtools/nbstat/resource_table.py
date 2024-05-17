@@ -492,7 +492,7 @@ class ResourceTable:
             for line, string in zip(lines, strings):
                 line.append(string)
 
-        lines = [' '.join(line).rstrip() + terminal.normal for line in lines]
+        lines = [terminal.normal + ' '.join(line).rstrip() + terminal.normal for line in lines]
 
         # Add separators between index values
         if separate_index or (add_header and separate_header):
@@ -518,7 +518,7 @@ class ResourceTable:
                 start = jdx + 1
                 jdx = l0.find('┃', start)
             separator.append(terminal.separator_symbol * terminal.length(l0[start:]))
-            separator = '┃'.join(separator) + terminal.normal
+            separator = '┃'.join(separator)
 
             for idx in separator_indices:
                 lines.insert(idx, separator)

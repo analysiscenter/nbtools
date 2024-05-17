@@ -620,7 +620,7 @@ class ResourceInspector:
     def make_terminal(self, force_styling, separator):
         """ Create terminal instance. """
         terminal = Terminal(kind=os.getenv('TERM'), force_styling=force_styling if force_styling else None)
-        terminal.separator_symbol = terminal.bold + separator
+        terminal.separator_symbol = separator
         terminal._normal = '\x1b[0;10m' # pylint: disable=protected-access
 
         # Change some methods to a faster versions
