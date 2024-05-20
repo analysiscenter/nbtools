@@ -78,6 +78,7 @@ class Resource(Enum):
     DEVICE_PROCESS_N = auto()
     DEVICE_PROCESS_PID = 'device_pid'
     DEVICE_PROCESS_MEMORY_USED = 'process_memory'
+    DEVICE_PROCESS_MEMORY_USED_ = auto()
 
     # Used for better repr in formatter tables
     TABLE_DELIMITER1 = auto()
@@ -133,9 +134,8 @@ class Resource(Enum):
             string = 'DEVICE PID'
 
         # Device resources
-        elif self == Resource.DEVICE_MEMORY_USED:
-            style = terminal.gold2
-        elif self == Resource.DEVICE_PROCESS_MEMORY_USED:
+        elif self in [Resource.DEVICE_MEMORY_USED,
+                      Resource.DEVICE_PROCESS_MEMORY_USED, Resource.DEVICE_PROCESS_MEMORY_USED_]:
             style = terminal.gold2
         elif self == Resource.DEVICE_POWER_USED:
             style = terminal.magenta
@@ -158,7 +158,7 @@ class Resource(Enum):
         if style is None:
             style = ''
         if string is None:
-            string = self.name.replace('', '').replace('DEVICE_', '').replace('_USED', '').replace('_', ' ')
+            string = self.name.replace('', '').replace('DEVICE_', '').replace('_USED', '').replace('_', ' ').strip()
         return style, string
 
 

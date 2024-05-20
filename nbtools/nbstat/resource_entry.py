@@ -100,16 +100,16 @@ class ResourceEntry(dict):
                 device_name = (self[Resource.DEVICE_NAME]
                                .replace('NVIDIA', '').replace('RTX', '').replace('GeForce', '')
                                .replace('  ', ' ').strip())
-                string = f'{device_name} [{data}]'
+                string = f'[{data}]   '
 
         # Device resources
         elif resource == Resource.DEVICE_MEMORY_USED:
             if data is not None:
-                style = terminal.bold if data > 10*1024*1024 else ''
-
                 memory_format = kwargs['device_memory_format']
                 used, unit = format_memory(data, format=memory_format)
                 total, unit = format_memory(self[Resource.DEVICE_MEMORY_TOTAL], format=memory_format)
+
+                style = terminal.bold if used > total * 0.02 else ''
 
                 n_digits = len(str(total))
                 string = (f'{terminal.normal + terminal.gold2}{style}{used:>{n_digits}}'
@@ -119,12 +119,12 @@ class ResourceEntry(dict):
 
         elif resource == Resource.DEVICE_PROCESS_MEMORY_USED:
             if data is not None:
-                style = terminal.bold if data > 10*1024*1024 else ''
-
                 memory_format = kwargs['device_memory_format']
                 used_process, unit = format_memory(data, format=memory_format)
                 used_device, unit = format_memory(self[Resource.DEVICE_MEMORY_USED], format=memory_format)
                 total, _ = format_memory(self[Resource.DEVICE_MEMORY_TOTAL], format=memory_format)
+
+                style = terminal.bold if used_process > total * 0.02 else ''
 
                 n_digits = len(str(total))
                 string = (f'{terminal.normal + terminal.gold2}{style}{used_process:>{n_digits}}'
@@ -140,6 +140,16 @@ class ResourceEntry(dict):
                     entry = ResourceEntry(entry)
                     style, string = entry.to_format_data(resource=Resource.DEVICE_MEMORY_USED,
                                                          terminal=terminal, **kwargs)
+
+        elif resource == Resource.DEVICE_PROCESS_MEMORY_USED_:
+            data = self.get(Resource.DEVICE_PROCESS_MEMORY_USED, None)
+
+            if data is not None:
+                style = terminal.bold if data > 10*1024*1024 else ''
+                memory_format = kwargs['device_memory_format']
+                used_process, unit = format_memory(data, format=memory_format)
+                string = (f'{terminal.normal + terminal.gold2}{style}{used_process} '
+                          f'{terminal.normal + terminal.bold}{unit}')
 
         elif resource == Resource.DEVICE_POWER_USED:
             if data is not None:

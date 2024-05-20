@@ -40,7 +40,7 @@ class ResourceInspector:
         self.warnings = {}
 
         self._cache = {}
-        self._h_position = 0
+        self._v_position = 0
 
     @property
     def device_handles(self):
@@ -511,7 +511,7 @@ class ResourceInspector:
                  add_footnote=False, underline_footnote=False, bold_footnote=True,
                  add_help=False, underline_help=False, bold_help=True,
                  use_cache=False,
-                 h_change=0,
+                 vertical_change=0,
                  separate_index=True, separator='—', hide_similar=True,
                  process_memory_format='GB', device_memory_format='MB'):
         """ Get the desired view. Format it into colored string.
@@ -578,20 +578,20 @@ class ResourceInspector:
                                       process_memory_format=process_memory_format)
 
         if add_help:
-            lines = self.add_help(lines, terminal=terminal,
+            lines = self.add_help(lines, terminal=terminal, name=name,
                                   underline=underline_help, bold=bold_help)
 
         # Select visible lines: keep header / footnote+help, move just the index items
         if 'watch' in name:
-            h_start = int(add_header) + int(separate_header)
-            h_end = int(separate_table) + 2*int(add_footnote) + 2*int(add_help)
-            h_size = terminal.height - h_start - h_end - 5
+            v_start = int(add_header) + int(separate_header)
+            v_end = int(separate_table) + 2*int(add_footnote) + 2*int(add_help)
+            v_size = terminal.height - v_start - v_end - 5
 
-            self._h_position = max(0, min(self._h_position + h_change, len(lines) - h_start - h_end - h_size))
-            h_slice_start = h_start + self._h_position
-            h_slice_end = h_slice_start + h_size
+            self._v_position = max(0, min(self._v_position + vertical_change, len(lines) - v_start - v_end - v_size))
+            v_slice_start = v_start + self._v_position
+            v_slice_end = v_slice_start + v_size
             if len(lines) > terminal.height:
-                lines = lines[:h_start] + lines[h_slice_start : h_slice_end] + lines[-(h_end or 1):]
+                lines = lines[:v_start] + lines[v_slice_start : v_slice_end] + lines[-(v_end or 1):]
 
         # Placeholder for empty table
         if not table:
@@ -699,19 +699,19 @@ class ResourceInspector:
 
         return lines
 
-    def add_help(self, lines, terminal, underline=True, bold=True):
+    def add_help(self, lines, terminal, name, underline=True, bold=True):
         """ Add a footnote with info about current CPU and RSS usage. """
         # General controls
         parts = [
             'TAB: SWITCH VIEWS',
-            'V: VERBOSITY',
+            'V: VERBOSITY' if 'nb' in name else None,
             'S: SEPARATORS',
             # 'B: BARS',
             # 'M: MOVING AVGS',
             'R: RESET',
             'Q: QUIT'
         ]
-        parts = ['    '.join(parts)]
+        parts = ['    '.join([part for part in parts if part])]
 
         lines = self.add_line(lines=lines, parts=parts, terminal=terminal,
                               position=len(lines), separator_position=None,

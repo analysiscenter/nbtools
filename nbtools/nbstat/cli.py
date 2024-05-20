@@ -83,7 +83,7 @@ def output_looped(inspector, name, formatter, view_args,
                     start_time = time()
                     view = inspector.get_view(name=name, formatter=formatter, **view_args)
                     current_len = true_len(view)
-                    view_args['h_change'] = 0
+                    view_args['vertical_change'] = 0
 
                     # Select starting position: if needed, redraw the entire screen, otherwise just move cursor position
                     if abs(current_len - prev_len) > 100 or force_clear or (counter % 100 == 0):
@@ -137,7 +137,7 @@ def output_looped(inspector, name, formatter, view_args,
                             if formatter[Resource.DEVICE_UTIL]:
                                 formatter[Resource.DEVICE_UTIL_MA] = not formatter[Resource.DEVICE_UTIL_MA]
                         elif inkey == 'v':
-                            view_args['verbose'] = (view_args['verbose'] + 1) % 3
+                            view_args['verbose'] = 2 - view_args['verbose'] # toggle between `0` and `2`
 
                         # F1-F4: regular stats
                         elif inkey.code == terminal.KEY_F1:
@@ -149,7 +149,7 @@ def output_looped(inspector, name, formatter, view_args,
                         elif inkey.code == terminal.KEY_F4:
                             formatter[Resource.RSS] = not formatter[Resource.RSS]
 
-                        # F1-F8: device stats
+                        # F5-F8: device stats
                         elif inkey.code == terminal.KEY_F5:
                             if Resource.DEVICE_SHORT_ID in formatter:
                                 formatter[Resource.DEVICE_SHORT_ID] = not formatter[Resource.DEVICE_SHORT_ID]
@@ -162,16 +162,26 @@ def output_looped(inspector, name, formatter, view_args,
                             formatter[Resource.DEVICE_UTIL] = not formatter[Resource.DEVICE_UTIL]
                         elif inkey.code == terminal.KEY_F8:
                             formatter[Resource.DEVICE_TEMP] = not formatter[Resource.DEVICE_TEMP]
-                        # TODO: add more keystrokes for columns: TYPE, STATUS, PATH
 
+                        # shift F1-F4
+                        elif inkey.code == terminal.KEY_F13:
+                            formatter[Resource.TYPE] = not formatter[Resource.TYPE]
+                        elif inkey.code == terminal.KEY_F14:
+                            formatter[Resource.STATUS] = not formatter[Resource.STATUS]
+                        elif inkey.code == terminal.KEY_F15:
+                            formatter[Resource.CREATE_TIME] = not formatter[Resource.CREATE_TIME]
+                        elif inkey.code == terminal.KEY_F16:
+                            formatter[Resource.PATH] = not formatter[Resource.PATH]
+
+                        # Vertical scroll
                         elif inkey.code == terminal.KEY_DOWN:
-                            view_args['h_change'] = +1
+                            view_args['vertical_change'] = +1
                         elif inkey.code == terminal.KEY_UP:
-                            view_args['h_change'] = -1
+                            view_args['vertical_change'] = -1
                         elif inkey.code == terminal.KEY_PGDOWN:
-                            view_args['h_change'] = +terminal.height // 2
+                            view_args['vertical_change'] = +terminal.height // 2
                         elif inkey.code == terminal.KEY_PGUP:
-                            view_args['h_change'] = -terminal.height // 2
+                            view_args['vertical_change'] = -terminal.height // 2
 
                         elif inkey == 'q':
                             raise KeyboardInterrupt
@@ -246,7 +256,7 @@ DEFAULTS = {
     'add_help': False,
 
     'use_cache': False,
-    'h_change': 0,
+    'vertical_change': 0,
 
     'separate_header': True,
     'separate_index': True,

@@ -145,8 +145,6 @@ class ResourceFormatter(list):
 NBSTAT_FORMATTER = ResourceFormatter([
     # Notebook/script name
     {'resource' : Resource.NAME, 'include' : True, 'hidable': True},
-    {'resource' : Resource.PATH, 'include' : False, 'hidable': True},
-    {'resource' : Resource.CMDLINE, 'include' : False, 'hidable': True},
 
     # Process info
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
@@ -164,11 +162,11 @@ NBSTAT_FORMATTER = ResourceFormatter([
 
     # Process resource usage
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
-    {'resource' : Resource.CPU, 'include' : False, 'min_width' : 5},
+    {'resource' : Resource.CPU, 'include' : True, 'min_width' : 5},
     {'resource' : Resource.RSS, 'include' : True, 'min_width' : 8},
 
     # Process device usage
-    {'resource' : Resource.TABLE_DELIMITER2, 'include' : True},
+    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
     {'resource' : Resource.DEVICE_SHORT_ID, 'include' : True},
     {'resource' : Resource.DEVICE_PROCESS_PID, 'include' : False},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
@@ -180,6 +178,11 @@ NBSTAT_FORMATTER = ResourceFormatter([
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
     {'resource' : Resource.DEVICE_POWER_USED, 'include' : False},
     {'resource' : Resource.DEVICE_FAN, 'include' : False, 'min_width' : 4},
+    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
+
+    # Hidden
+    {'resource' : Resource.PATH, 'include' : False, 'hidable': True},
+    {'resource' : Resource.CMDLINE, 'include' : False, 'hidable': True},
 ])
 
 
@@ -200,7 +203,6 @@ DEVICESTAT_FORMATTER = ResourceFormatter([
 
     # Notebook/script name
     {'resource' : Resource.NAME, 'include' : True},
-    {'resource' : Resource.CMDLINE, 'include' : False, 'hidable': True},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
 
     # Process info
@@ -220,6 +222,9 @@ DEVICESTAT_FORMATTER = ResourceFormatter([
     {'resource' : Resource.CPU, 'include' : False, 'min_width' : 5},
     {'resource' : Resource.RSS, 'include' : False, 'min_width' : 10},
 
+    # Hidden
+    {'resource' : Resource.PATH, 'include' : False, 'hidable': True},
+    {'resource' : Resource.CMDLINE, 'include' : False, 'hidable': True},
 ])
 
 
