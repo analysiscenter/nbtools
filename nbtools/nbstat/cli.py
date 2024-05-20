@@ -62,6 +62,7 @@ def output_once(inspector, name, formatter, view_args):
 def output_looped(inspector, name, formatter, view_args,
                   other_name, other_formatter, other_view_args, interval=0.5):
     """ Output visualization to a stdout once each `interval` seconds in a fullscreen mode. """
+    #pylint: disable=too-many-statements
     terminal = Terminal()
 
     initial_view_args = dict(view_args)

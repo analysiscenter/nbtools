@@ -730,8 +730,8 @@ class ResourceInspector:
             (8, 'TEMP', terminal.on_red),
         ]
 
-        for f, name, color in resource_and_color:
-            parts.append(f'{terminal.bold}{color}F{f}: {name}{terminal.normal}')
+        for f, name_, color in resource_and_color:
+            parts.append(f'{terminal.bold}{color}F{f}: {name_}{terminal.normal}')
         parts = ['  '.join(parts)]
 
 
