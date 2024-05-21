@@ -8,7 +8,7 @@ from .resource import Resource
 
 class ResourceFormatter(list):
     """ An ordered sequence to define which resources to request from the system, as well as
-    how to structure them into formatted table.
+    how to structure them into a formatted table.
 
     Each element is a dictionary with mandatory `resource` and `include` keys, and defines whether this
     `resource` must be fetched/included in the table based on the value of `include` flag.
@@ -86,7 +86,7 @@ class ResourceFormatter(list):
             self.extend(other)
 
     def copy(self):
-        """ Deep copy of the formatter. Used to not mess up the original formatter. """
+        """ Deep copy of the formatter. Used to avoid messing up the original formatter. """
         return deepcopy(self)
 
     def include_all(self):
@@ -96,7 +96,7 @@ class ResourceFormatter(list):
 
     @property
     def included_only(self):
-        """ Return formatter with elements which `include` flag is set to True.
+        """ Return the formatter, including only the elements where the `include` flag is set to True.
         Also removes subsequent duplicates of table delimiters.
         """
         formatter = []
