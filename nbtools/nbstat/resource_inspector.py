@@ -567,6 +567,12 @@ class ResourceInspector:
                              separate_index=separate_index, hide_similar=hide_similar,
                              process_memory_format=process_memory_format, device_memory_format=device_memory_format)
 
+        # Placeholder for empty table
+        if not table:
+            width = terminal.length(lines[-1])
+            placeholder = terminal.center(terminal.bold + '---no entries to display---' + terminal.normal, width)
+            lines.insert(1, placeholder)
+
         # Additional line elements: separator, footnote, help
         if separate_table:
             separator = terminal.bold + '-' * terminal.length(lines[0])
@@ -592,12 +598,6 @@ class ResourceInspector:
             v_slice_end = v_slice_start + v_size
             if len(lines) > terminal.height:
                 lines = lines[:v_start] + lines[v_slice_start : v_slice_end] + lines[-(v_end or 1):]
-
-        # Placeholder for empty table
-        if not table:
-            width = terminal.length(lines[-1])
-            placeholder = terminal.rjust(terminal.bold + 'No entries to display!' + terminal.normal, width)
-            lines.insert(2, placeholder)
 
         return '\n'.join(lines) + terminal.normal
 

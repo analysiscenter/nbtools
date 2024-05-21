@@ -503,31 +503,32 @@ class ResourceTable:
                 separator_indices.append(s)
                 s += len(subtable)
 
-            header_idx = None
-            if (add_header and separate_header) and separate_index:
-                separator_indices = separator_indices[::-1]
-                header_idx = separator_indices[-1]
-            elif add_header and separate_header:
-                separator_indices = separator_indices[:1]
-                header_idx = separator_indices[0]
-            else:
-                separator_indices = separator_indices[1:][::-1]
+            if separator_indices:
+                header_idx = None
+                if (add_header and separate_header) and separate_index:
+                    separator_indices = separator_indices[::-1]
+                    header_idx = separator_indices[-1]
+                elif add_header and separate_header:
+                    separator_indices = separator_indices[:1]
+                    header_idx = separator_indices[0]
+                else:
+                    separator_indices = separator_indices[1:][::-1]
 
-            # Make a separator: insert delimiters at correct (sequence-wise!) place
-            l0 = terminal.rjust(terminal.strip(lines[0]), terminal.length(lines[0]))
-            separator = []
-            start, jdx = 0, l0.find('┃')
-            while jdx != -1:
-                separator.append(terminal.separator_symbol * terminal.length(l0[start:jdx]))
-                start = jdx + 1
-                jdx = l0.find('┃', start)
-            separator.append(terminal.separator_symbol * terminal.length(l0[start:]))
-            separator = '┃'.join(separator)
-            header_separator = separator.replace(terminal.separator_symbol, terminal.bold + '-' + terminal.normal)
+                # Make a separator: insert delimiters at correct (sequence-wise!) place
+                l0 = terminal.rjust(terminal.strip(lines[0]), terminal.length(lines[0]))
+                separator = []
+                start, jdx = 0, l0.find('┃')
+                while jdx != -1:
+                    separator.append(terminal.separator_symbol * terminal.length(l0[start:jdx]))
+                    start = jdx + 1
+                    jdx = l0.find('┃', start)
+                separator.append(terminal.separator_symbol * terminal.length(l0[start:]))
+                separator = '┃'.join(separator)
+                header_separator = separator.replace(terminal.separator_symbol, terminal.bold + '-' + terminal.normal)
 
-            for idx in separator_indices:
-                sep = separator if idx != header_idx else header_separator
-                lines.insert(idx, sep)
+                for idx in separator_indices:
+                    sep = separator if idx != header_idx else header_separator
+                    lines.insert(idx, sep)
 
         return lines
 
