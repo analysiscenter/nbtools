@@ -269,7 +269,7 @@ DEFAULTS = {
 }
 
 def make_parameters(name):
-    """ Parse parameters from command line into dictionary.
+    """ Parse parameters from the command line into a dictionary.
     Use `store_const` instad of `store_true` to keep `None` values, if not passed explicitly
     """
     # Set defaults

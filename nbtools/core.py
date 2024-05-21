@@ -139,7 +139,8 @@ def get_available_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False,
 
     Returns
     -------
-    List with indices of available GPUs
+    available_devices : list
+        Indices of available GPUs.
     """
     try:
         import nvidia_smi
@@ -215,6 +216,11 @@ def set_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False, raise_err
         If 2, then display memory and process information for each device.
     raise_error : bool
         Whether to raise an exception if not enough devices are available.
+
+    Returns
+    -------
+    devices : list
+        Indices of selected and reserved GPUs.
     """
     #pylint: disable=consider-iterating-dictionary
     if 'CUDA_VISIBLE_DEVICES' in os.environ.keys():

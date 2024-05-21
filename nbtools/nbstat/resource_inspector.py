@@ -1,4 +1,6 @@
-""" Controlling class for fetching tables with system information, merging them into view and displaying in stream. """
+""" Controlling class for fetching tables with system information,
+merging them into a view and displaying in a stream.
+"""
 import os
 import re
 import json
@@ -212,7 +214,7 @@ class ResourceInspector:
 
     def get_process_table(self, formatter=None):
         """ Collect information about all Python processes.
-        Information varies from properties of a process (its path, PID, NGID, status, etc) to system resource usage like
+        Information varies from process properties (its path, PID, NGID, status, etc) to system resource usage like
         CPU utilization or RSS. The table also includes some inferred columns like type and kernel_id.
 
         Some of the fields are intentionally left blank / with meaningless defaults: those are supposed to be filled by
@@ -489,7 +491,7 @@ class ResourceInspector:
 
     def devicestat_check_device_pids(self, table):
         """ Check if some of the `device pids` are not matched to any Python processes.
-        Add template names to them insted of empty ones.
+        Add template names to them instead of empty ones.
         """
         self.warnings['missing_device_pids'] = set()
         for entry in table:
