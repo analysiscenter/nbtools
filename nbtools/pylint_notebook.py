@@ -70,12 +70,12 @@ def generate_pylintrc(path, disable=(), enable=(), max_line_length=120, **pylint
     return pylintrc
 
 
-def pylint_notebook(path=None, options=(), disable=(), enable=(), printer=print,
+def pylint_notebook(path=None, options=(), config=None, disable=(), enable=(), printer=print,
                     remove_files=True, return_info=False, **pylint_params):
     """ Execute `pylint` for a provided Jupyter Notebook.
 
     Under the hood, roughly does the following:
-        - Creates a `.pylintrc` file next to the `path`.
+        - Creates a `.pylintrc` file next to the `path`, if needed.
         - Converts the notebook to `.py` file next to the `path`.
         - Runs `pylint` with additional options.
         - Create a report and display it, if needed.
@@ -86,6 +86,9 @@ def pylint_notebook(path=None, options=(), disable=(), enable=(), printer=print,
         Path to the Jupyter notebook. If not provided, the current notebook is used.
     options : sequence
         Additional options for `pylint` execution.
+    config : str, None
+        Path to a pylint config in the `.pylintrc` format.
+        Note, if config is not None, then `disable` and `enable` are not used.
     printer : callable or None
         Function to display the report.
     remove_files : bool
@@ -121,8 +124,16 @@ def pylint_notebook(path=None, options=(), disable=(), enable=(), printer=print,
     code, cell_line_numbers = notebook_to_script(path_notebook=path, path_script=path_script, return_info=True).values()
 
     # Create pylintrc file
-    path_pylintrc = os.path.splitext(path)[0] + '.pylintrc'
-    pylintrc = generate_pylintrc(path_pylintrc, disable=disable, enable=enable, **pylint_params)
+    if config is None:
+        path_pylintrc = os.path.splitext(path)[0] + '.pylintrc'
+        pylintrc = generate_pylintrc(path_pylintrc, disable=disable, enable=enable, **pylint_params)
+    else:
+        path_pylintrc = config
+
+        # Open config for output
+        if return_info:
+            with open(path_pylintrc, 'r', encoding='utf-8') as rcfile:
+                pylintrc = rcfile.read()
 
     # Run pylint on script with pylintrc configuration
     pylint_cmdline = [path_pylintrc, f'--rcfile={path_pylintrc}', *options]
@@ -176,7 +187,8 @@ def pylint_notebook(path=None, options=(), disable=(), enable=(), printer=print,
 
     if remove_files:
         os.remove(path_script)
-        os.remove(path_pylintrc)
+        if config is None:
+            os.remove(path_pylintrc)
 
     if printer is not None:
         printer(output)

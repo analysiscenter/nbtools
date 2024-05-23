@@ -56,13 +56,13 @@ class ResourceEntry(dict):
                     data = '~' + data.split('/')[-1]
                 if len(data) >= 60:
                     data = data.replace('.ipynb', '').replace('.py', '')
-                    data = data[:30] + '[...]' + data[-30]
+                    data = data[:30] + '[...]'
 
         elif resource == Resource.TYPE:
             if data is not None:
                 if 'zombie' in data or 'containerd' in data:
                     style = terminal.red
-                if 'run_notebook' in data:
+                if data == 'exec_notebook':
                     style = terminal.green
 
         elif resource == Resource.CREATE_TIME:
@@ -100,38 +100,38 @@ class ResourceEntry(dict):
                 device_name = (self[Resource.DEVICE_NAME]
                                .replace('NVIDIA', '').replace('RTX', '').replace('GeForce', '')
                                .replace('  ', ' ').strip())
-                string = f'{device_name} [{data}]'
+                string = f'[{data}]   '
 
         # Device resources
         elif resource == Resource.DEVICE_MEMORY_USED:
             if data is not None:
-                style = terminal.bold if data > 10*1024*1024 else ''
-
                 memory_format = kwargs['device_memory_format']
                 used, unit = format_memory(data, format=memory_format)
                 total, unit = format_memory(self[Resource.DEVICE_MEMORY_TOTAL], format=memory_format)
 
+                style = terminal.bold if used > total * 0.02 else ''
+
                 n_digits = len(str(total))
-                string = (f'{terminal.normal + terminal.yellow}{style}{used:>{n_digits}}'
+                string = (f'{terminal.normal + terminal.gold2}{style}{used:>{n_digits}}'
                           f'{terminal.normal + terminal.bold} / '
-                          f'{terminal.normal + terminal.yellow}{style}{total} '
+                          f'{terminal.normal + terminal.gold2}{style}{total} '
                           f'{terminal.normal + terminal.bold}{unit}')
 
         elif resource == Resource.DEVICE_PROCESS_MEMORY_USED:
             if data is not None:
-                style = terminal.bold if data > 10*1024*1024 else ''
-
                 memory_format = kwargs['device_memory_format']
                 used_process, unit = format_memory(data, format=memory_format)
                 used_device, unit = format_memory(self[Resource.DEVICE_MEMORY_USED], format=memory_format)
                 total, _ = format_memory(self[Resource.DEVICE_MEMORY_TOTAL], format=memory_format)
 
+                style = terminal.bold if used_process > total * 0.02 else ''
+
                 n_digits = len(str(total))
-                string = (f'{terminal.normal + terminal.yellow}{style}{used_process:>{n_digits}}'
+                string = (f'{terminal.normal + terminal.gold2}{style}{used_process:>{n_digits}}'
                           f'{terminal.normal + terminal.bold} / '
-                          f'{terminal.normal + terminal.yellow}{style}{max(used_device, used_process):>{n_digits}}'
+                          f'{terminal.normal + terminal.gold2}{style}{max(used_device, used_process):>{n_digits}}'
                           f'{terminal.normal + terminal.bold} / '
-                          f'{terminal.normal + terminal.yellow}{style}{total} '
+                          f'{terminal.normal + terminal.gold2}{style}{total} '
                           f'{terminal.normal + terminal.bold}{unit}')
             else:
                 # Fallback to total device memory usage, if possible
@@ -140,6 +140,16 @@ class ResourceEntry(dict):
                     entry = ResourceEntry(entry)
                     style, string = entry.to_format_data(resource=Resource.DEVICE_MEMORY_USED,
                                                          terminal=terminal, **kwargs)
+
+        elif resource == Resource.DEVICE_PROCESS_MEMORY_USED_:
+            data = self.get(Resource.DEVICE_PROCESS_MEMORY_USED, None)
+
+            if data is not None:
+                style = terminal.bold if data > 10*1024*1024 else ''
+                memory_format = kwargs['device_memory_format']
+                used_process, unit = format_memory(data, format=memory_format)
+                string = (f'{terminal.normal + terminal.gold2}{style}{used_process} '
+                          f'{terminal.normal + terminal.bold}{unit}')
 
         elif resource == Resource.DEVICE_POWER_USED:
             if data is not None:
@@ -176,7 +186,7 @@ class ResourceEntry(dict):
         elif resource == Resource.TABLE_DELIMITER1:
             string = '┃'
         elif resource == Resource.TABLE_DELIMITER2:
-            string = '║'
+            string = '┃┃'
 
         # Default values
         if style is None:

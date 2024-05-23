@@ -1,4 +1,6 @@
-""" Controlling class for fetching tables with system information, merging them into view and displaying in stream. """
+""" Controlling class for fetching tables with system information,
+merging them into a view and displaying in a stream.
+"""
 import os
 import re
 import json
@@ -12,8 +14,8 @@ import nvidia_smi
 
 from .resource import Resource
 from .resource_table import ResourceTable
-from .utils import format_memory, pid_to_name, pid_to_ngid, true_len, true_rjust, true_center, FiniteList
-from ..run_notebook import get_run_notebook_name
+from .utils import format_memory, pid_to_name, pid_to_ngid, FiniteList, true_len, true_rjust, true_center
+from ..exec_notebook import get_exec_notebook_name
 
 
 
@@ -38,6 +40,9 @@ class ResourceInspector:
         self._device_handles = None
         self._device_utils = None
         self.warnings = {}
+
+        self._cache = {}
+        self._v_position = 0
 
     @property
     def device_handles(self):
@@ -139,6 +144,11 @@ class ResourceInspector:
                     device_process_table.append(device_process_info)
 
             device_table.append(device_info)
+
+        self._cache.update({
+            'device_table': device_table,
+            'device_process_table': device_process_table,
+        })
         return device_table, device_process_table
 
     def get_notebook_table(self, formatter=None):
@@ -173,13 +183,24 @@ class ResourceInspector:
                                     params={'token': server.get('token', '')})
 
             for instance in json.loads(response.text):
+                name = instance['notebook']['name']
+                path = os.path.join(root_dir, instance['notebook']['path'])
                 kernel_id = instance['kernel']['id']
+
+                if not os.path.exists(path):
+                    # VSCode notebooks use tmp files with mangled names
+                    # Also, the path may be incorrect, and we can't fix that
+                    name = '-'.join(name[:-6].split('-')[:-5]) + '.ipynb'
+                    path = '-'.join(path[:-6].split('-')[:-10]) + '.ipynb'
+
                 notebook_info = {
-                    Resource.NAME : instance['notebook']['name'],
-                    Resource.PATH : os.path.join(root_dir, instance['notebook']['path']),
+                    Resource.NAME : name,
+                    Resource.PATH : path,
                     Resource.KERNEL : kernel_id,
                 }
                 notebook_table.append(notebook_info)
+
+        self._cache['notebook_table'] = notebook_table
         return notebook_table
 
     def get_python_pids(self):
@@ -193,7 +214,7 @@ class ResourceInspector:
 
     def get_process_table(self, formatter=None):
         """ Collect information about all Python processes.
-        Information varies from properties of a process (its path, PID, NGID, status, etc) to system resource usage like
+        Information varies from process properties (its path, PID, NGID, status, etc) to system resource usage like
         CPU utilization or RSS. The table also includes some inferred columns like type and kernel_id.
 
         Some of the fields are intentionally left blank / with meaningless defaults: those are supposed to be filled by
@@ -234,7 +255,7 @@ class ResourceInspector:
                     kernel_id = KERNEL_ID_SEARCHER(cmdline)
                     vscode_key = VSCODE_KEY_SEARCHER(cmdline)
                     script_name = SCRIPT_NAME_SEARCHER(cmdline)
-                    run_notebook_path = RUN_NOTEBOOK_PATH_SEARCHER(cmdline)
+                    exec_notebook_path = RUN_NOTEBOOK_PATH_SEARCHER(cmdline)
 
                     if kernel_id:
                         # The name will be changed by data from `notebook_table`.
@@ -248,10 +269,10 @@ class ResourceInspector:
                         type_ = 'vscode'
                         name = vscode_key.group(1).split('-')[0] + '.ipynb'
                         path = kernel_id = vscode_key.group(1)
-                    elif run_notebook_path:
-                        type_ = 'run_notebook'
-                        name = get_run_notebook_name(process.ppid())
-                        path = cwd
+                    elif exec_notebook_path:
+                        type_ = 'exec_notebook'
+                        name = get_exec_notebook_name(process.ppid())
+                        path = os.path.join(cwd, name)
                         kernel_id = None
                     elif script_name:
                         type_ = 'script'
@@ -266,8 +287,8 @@ class ResourceInspector:
 
                     # PYTHON_PPID = PPID if parent is Python process else -1
                     ppid = process.ppid()
-                    if type_ == 'run_notebook':
-                        # Spawned by `run_notebook` function of the library
+                    if type_ == 'exec_notebook':
+                        # Spawned by `exec_notebook` function of the library
                         python_ppid = ppid
                     elif ppid in python_pids:
                         # Spawned by one of other Python processes
@@ -319,6 +340,7 @@ class ResourceInspector:
                     if entry_[Resource.PID] == ppid and entry_[Resource.PYTHON_PPID] == -1:
                         entry.update({key : entry_[key] for key in [Resource.NAME, Resource.PATH, Resource.KERNEL]})
 
+        self._cache['process_table'] = process_table
         return process_table
 
 
@@ -469,7 +491,7 @@ class ResourceInspector:
 
     def devicestat_check_device_pids(self, table):
         """ Check if some of the `device pids` are not matched to any Python processes.
-        Add template names to them insted of empty ones.
+        Add template names to them instead of empty ones.
         """
         self.warnings['missing_device_pids'] = set()
         for entry in table:
@@ -486,9 +508,12 @@ class ResourceInspector:
     # Make formatted visualization of tables
     def get_view(self, name='nbstat', formatter=None, index_condition=None, force_styling=True,
                  sort=True, verbose=0, window=20, interval=None,
-                 add_supheader=True, underline_supheader=True, bold_supheader=True, separate_supheader=False,
                  add_header=True, underline_header=True, bold_header=False, separate_header=True,
-                 add_footnote=False, underline_footnote=False, bold_footnote=False, separate_footnote=True,
+                 separate_table=False,
+                 add_footnote=False, underline_footnote=False, bold_footnote=True,
+                 add_help=False, underline_help=False, bold_help=True,
+                 use_cache=False,
+                 vertical_change=0,
                  separate_index=True, separator='—', hide_similar=True,
                  process_memory_format='GB', device_memory_format='MB'):
         """ Get the desired view. Format it into colored string.
@@ -496,63 +521,118 @@ class ResourceInspector:
         """
         formatter = formatter or self.formatter
 
-        # Get the table
-        if name.startswith('nb'):
-            table = self.make_nbstat_table(formatter=formatter, sort=sort, verbose=verbose, window=window)
-        elif name.startswith('device'):
-            table = self.make_devicestat_table(formatter=formatter, window=window)
-        elif name.startswith('gpu'):
-            table = self.make_gpustat_table(formatter=formatter, window=window)
+        # Get the table from cache or re-compute it
+        if use_cache and self.cache_available(name=name, formatter=formatter, verbose=verbose,
+                                              interval=interval * 0.8):
+            table = self._cache['table']
         else:
-            raise ValueError('Wrong name of view to get!')
+            # Compute the table
+            if name.startswith('nb'):
+                table = self.make_nbstat_table(formatter=formatter, sort=sort, verbose=verbose, window=window)
+            elif name.startswith('device'):
+                table = self.make_devicestat_table(formatter=formatter, window=window)
+            elif name.startswith('gpu'):
+                table = self.make_gpustat_table(formatter=formatter, window=window)
+            else:
+                raise ValueError('Wrong name of view to get!')
 
-        # Filter some processes
-        if 'nb' in name and table:
-            bad_names = ['lsp_server']
-            function = lambda index_value, _: not any(name in index_value for name in bad_names)
-            table.filter_on_index(function, inplace=True)
+            # Filter some processes
+            if 'nb' in name and table:
+                bad_names = ['lsp_server']
+                function = lambda index_value, _: not any(name in index_value for name in bad_names)
+                table.filter_on_index(function, inplace=True)
 
-        # Filter index of the table by a regular expression
-        if table and index_condition is not None:
-            function = lambda index_value, _: bool(re.search(index_condition, str(index_value)))
-            table.filter_on_index(function, inplace=True)
+            # Filter index of the table by a regular expression
+            if table and index_condition is not None:
+                function = lambda index_value, _: bool(re.search(index_condition, str(index_value)))
+                table.filter_on_index(function, inplace=True)
+
+            # Store the table into cache along with the parameters of its creation
+            self._cache.update({
+                'table': table,
+                'time': time.time(),
+                'parameters': {
+                    'name': name,
+                    'n_formatter': sum(int(column['include']) for column in formatter),
+                    'sort': sort,
+                    'verbose': verbose,
+                }
+            })
 
         # Create terminal instance
         terminal = self.make_terminal(force_styling=force_styling, separator=separator)
 
         # Make formatted strings
         lines = table.format(terminal=terminal, formatter=formatter,
-                             add_header=add_header, underline_header=underline_header,
-                             bold_header=bold_header, separate_header=separate_header,
+                             add_header=add_header, underline_header=underline_header, bold_header=bold_header,
+                             separate_header=separate_header,
                              separate_index=separate_index, hide_similar=hide_similar,
                              process_memory_format=process_memory_format, device_memory_format=device_memory_format)
-
-        if add_supheader:
-            lines = self.add_supheader(lines, terminal=terminal, interval=interval,
-                                       underline=underline_supheader, bold=bold_supheader, separate=separate_supheader)
-        if add_footnote:
-            lines = self.add_footnote(lines, terminal=terminal,
-                                      underline=underline_footnote, bold=bold_footnote, separate=separate_footnote,
-                                      process_memory_format=process_memory_format)
 
         # Placeholder for empty table
         if not table:
             width = terminal.length(lines[-1])
-            placeholder = terminal.rjust(terminal.bold + 'No entries to display!' + terminal.normal, width)
-            lines.insert(2, placeholder)
+            placeholder = terminal.center(terminal.bold + '---no entries to display---' + terminal.normal, width)
+            lines.insert(1, placeholder)
 
-        # For debug purposes
-        self._table = table
-        return '\n'.join(lines)
+        # Additional line elements: separator, footnote, help
+        if separate_table:
+            separator = terminal.bold + '-' * terminal.length(lines[0])
+            lines.append(separator)
+
+        if add_footnote:
+            lines = self.add_footnote(lines, terminal=terminal,
+                                      underline=underline_footnote, bold=bold_footnote,
+                                      process_memory_format=process_memory_format)
+
+        if add_help:
+            lines = self.add_help(lines, terminal=terminal, name=name,
+                                  underline=underline_help, bold=bold_help)
+
+        # Select visible lines: keep header / footnote+help, move just the index items
+        if 'watch' in name:
+            v_start = int(add_header) + int(separate_header)
+            v_end = int(separate_table) + 2*int(add_footnote) + 2*int(add_help)
+            v_size = terminal.height - v_start - v_end - 5
+
+            self._v_position = max(0, min(self._v_position + vertical_change, len(lines) - v_start - v_end - v_size))
+            v_slice_start = v_start + self._v_position
+            v_slice_end = v_slice_start + v_size
+            if len(lines) > terminal.height:
+                lines = lines[:v_start] + lines[v_slice_start : v_slice_end] + lines[-(v_end or 1):]
+
+        return '\n'.join(lines) + terminal.normal
+
+
+    def cache_available(self, name, formatter, verbose, interval):
+        """ Check if the stored cache is fresh enough to re-use it. """
+        if not self._cache or 'table' not in self._cache:
+            return False
+
+        if time.time() - self._cache['time'] > interval:
+            return False
+
+        if name != self._cache['parameters']['name']:
+            return False
+
+        if verbose != self._cache['parameters']['verbose']:
+            return False
+
+        n_formatter = sum(int(column['include']) for column in formatter)
+        if n_formatter != self._cache['parameters']['n_formatter']:
+            return False
+
+        return True
 
 
     def make_terminal(self, force_styling, separator):
         """ Create terminal instance. """
         terminal = Terminal(kind=os.getenv('TERM'), force_styling=force_styling if force_styling else None)
-        terminal.separator_symbol = terminal.bold + separator + terminal.normal
+        terminal.separator_symbol = separator
         terminal._normal = '\x1b[0;10m' # pylint: disable=protected-access
 
         # Change some methods to a faster versions
+        # TODO: better measurements and tests for the same outputs
         terminal.length = true_len
         terminal.rjust = true_rjust
         terminal.center = true_center
@@ -581,45 +661,83 @@ class ResourceInspector:
             lines.insert(separator_position, terminal.separator_symbol * terminal.length(added_line))
         return lines
 
-    def add_supheader(self, lines, terminal, interval=None, underline=True, bold=True, separate=True):
-        """ Add a supheader with info about current time, driver and CUDA versions. """
+
+    def add_footnote(self, lines, terminal, underline=True, bold=True, process_memory_format='GB'):
+        """ Add a footnote with info about current CPU, RSS and GPU usage. """
+        # N running notebooks, number of used devices
+        parts = []
+
+        if 'notebook_table' in self._cache:
+            n_notebooks = len(self._cache['notebook_table'])
+            parts.append(f'{terminal.pink}# KERNELS: {n_notebooks:>3}')
+
+        if 'device_table' in self._cache:
+            n_used_devices = sum(bool(entry[Resource.DEVICE_PROCESS_N]) for entry in self._cache['device_table'])
+            n_total_devices = len(self._cache['device_table'])
+            parts.append(f'{terminal.green}DEVICES USED: {n_used_devices} / {n_total_devices}')
+
+        if parts:
+            lines = self.add_line(lines=lines, parts=parts, terminal=terminal,
+                                position=len(lines), separator_position=None,
+                                underline=underline, bold=bold)
+
+        # System info
         timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-        interval_info = f'Interval: {interval:2.1f}s' if interval is not None else ''
-
-        driver_version = nvidia_smi.nvmlSystemGetDriverVersion()
-        driver_version = driver_version.decode() if isinstance(driver_version, bytes) else driver_version
-        driver_version = '.'.join(driver_version.split('.')[:-1])
-
-        cuda_version = nvidia_smi.nvmlSystemGetNVMLVersion()
-        cuda_version = cuda_version.decode() if isinstance(cuda_version, bytes) else cuda_version
-        cuda_version = cuda_version[:4]
-
-        parts = [
-            timestamp,
-            f'Driver Version: {driver_version}',
-            f'CUDA Version: {cuda_version}',
-            interval_info,
-        ]
-        lines = self.add_line(lines=lines, parts=parts, terminal=terminal,
-                              position=0, separator_position=1 if separate else None,
-                              underline=underline, bold=bold)
-        return lines
-
-    def add_footnote(self, lines, terminal, underline=True, bold=True, separate=True, process_memory_format='GB'):
-        """ Add a footnote with info about current CPU and RSS usage. """
         vm = psutil.virtual_memory()
         vm_used, unit = format_memory(vm.used, process_memory_format)
         vm_total, unit = format_memory(vm.total, process_memory_format)
         n_digits = len(str(vm_total))
 
         parts = [
-            f'{terminal.bold + terminal.cyan}SYSTEM CPU: {psutil.cpu_percent():6}%',
-            f'{terminal.bold + terminal.cyan}SYSTEM RSS: {vm_used:>{n_digits}} / {vm_total} {unit}'
+            timestamp,
+            f'CPU: {psutil.cpu_percent():6}%',
+            f'RSS: {vm_used:>{n_digits}} / {vm_total} {unit}',
         ]
+        parts = [terminal.cyan + part for part in parts]
 
         lines = self.add_line(lines=lines, parts=parts, terminal=terminal,
                               position=len(lines), separator_position=None,
                               underline=underline, bold=bold)
-        if separate:
-            lines.insert(-1, ' ')
+
+        return lines
+
+    def add_help(self, lines, terminal, name, underline=True, bold=True):
+        """ Add a footnote with info about current CPU and RSS usage. """
+        # General controls
+        parts = [
+            'TAB: SWITCH VIEWS',
+            'V: VERBOSITY' if 'nb' in name else None,
+            'S: SEPARATORS',
+            # 'B: BARS',
+            # 'M: MOVING AVGS',
+            'R: RESET',
+            'Q: QUIT'
+        ]
+        parts = ['    '.join([part for part in parts if part])]
+
+        lines = self.add_line(lines=lines, parts=parts, terminal=terminal,
+                              position=len(lines), separator_position=None,
+                              underline=underline, bold=bold)
+
+        # F-buttons: column controls
+        parts = []
+        resource_and_color = [
+            (1, 'PID', terminal.on_magenta),
+            (2, 'PPID', terminal.on_magenta),
+            (3, 'CPU', terminal.on_cyan),
+            (4, 'RSS', terminal.on_cyan),
+            (5, 'DEVICE', terminal.on_blue),
+            (6, 'MEMORY', terminal.on_yellow),
+            (7, 'UTIL', terminal.on_green),
+            (8, 'TEMP', terminal.on_red),
+        ]
+
+        for f, name_, color in resource_and_color:
+            parts.append(f'{terminal.bold}{color}F{f}: {name_}{terminal.normal}')
+        parts = ['  '.join(parts)]
+
+
+        lines = self.add_line(lines=lines, parts=parts, terminal=terminal,
+                              position=len(lines), separator_position=None,
+                              underline=underline, bold=False)
         return lines

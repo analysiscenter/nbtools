@@ -1,6 +1,6 @@
 """ ResourceEntry -- a dict-like class to hold all properties (Resources) of an entry.
 ResourceTable -- sequence of multiple ResourceEntries with interface of merging, updating, sorting for multiple tables.
-Can be formatted into beautiful colored string representation by using `format` method.
+Can be formatted into a beautiful colored string representation by using `format` method.
 """
 
 from .resource import Resource
@@ -18,7 +18,7 @@ class ResourceTable:
     versions for working with tables with defined `index`.
 
     For the most part, this class acts as a lightweight version of a`Pandas.DataFrame`: it saves us a huge dependency
-    and also allows to tweak some of the metods to our needs. As our tables are tiny, efficiency is not a concern.
+    and also allows to tweak some of the methods to our needs. As our tables are tiny, efficiency is not a concern.
     If the `pandas` is already installed, `ResourceTable` can be converted to dataframe by using `to_pd` method.
 
     Also provides method `format` for table visualization as a beautiful colored string representation.
@@ -313,7 +313,7 @@ class ResourceTable:
 
     def filter_on_index(self, condition, inplace=True):
         """ Filter subtables and index values, based on `condition`, evaluated on them.
-        Keep only those which evaluate to True.
+        Keep only those that evaluate to True.
         """
         self = self.maybe_copy(return_self=inplace)
 
@@ -359,7 +359,7 @@ class ResourceTable:
         return repr('\n'.join([str(entry) for entry in self.data]))
 
     def to_format_data(self, resource, terminal, **kwargs):
-        """ Create a string template and data for a given `resource` column from entire table.
+        """ Create a string template and data for a given `resource` column from the entire table.
         Works by aggregation information in the `resource` column and making string from it.
         For more information about formatting refer to `ResourceTable.format` method.
 
@@ -394,8 +394,8 @@ class ResourceTable:
             text formatting, and it is enough to format the string from entries.
             The header string is produced by (`style` + `name`).
 
-            - then we iterate over entries in the table. Each entry is requested to create a `style` and `string` for
-            current resource: that is done by the `ResourceEntry.to_format_data` method.
+            - then we iterate over the entries in the table. Each entry is requested to create a `style` and `string`
+            for the current resource: that is done by the `ResourceEntry.to_format_data` method.
             Note that we can't use just the resource and its value from the entry to create the `string`, as some of the
             columns require multiple items: for example, device memory requires current and total values.
             `style`, returned by the entry, can completely override the style from the Resource, but for the most cases,
@@ -438,6 +438,7 @@ class ResourceTable:
                   'device_memory_format' : device_memory_format}
 
         lines = [[] for _ in range(1 + len(self))]
+        widths = []
         for column_dict in formatter.included_only:
             # Retrieve parameters of the column display
             resource = column_dict['resource']
@@ -491,8 +492,9 @@ class ResourceTable:
 
             for line, string in zip(lines, strings):
                 line.append(string)
+            widths.append(width)
 
-        lines = [' '.join(line).rstrip() + terminal.normal for line in lines]
+        lines = [terminal.normal + ' '.join(line).rstrip() + terminal.normal for line in lines]
 
         # Add separators between index values
         if separate_index or (add_header and separate_header):
@@ -501,16 +503,32 @@ class ResourceTable:
                 separator_indices.append(s)
                 s += len(subtable)
 
-            if (add_header and separate_header) and separate_index:
-                separator_indices = separator_indices[::-1]
-            elif add_header and separate_header:
-                separator_indices = separator_indices[:1]
-            else:
-                separator_indices = separator_indices[1:][::-1]
+            if separator_indices:
+                header_idx = None
+                if (add_header and separate_header) and separate_index:
+                    separator_indices = separator_indices[::-1]
+                    header_idx = separator_indices[-1]
+                elif add_header and separate_header:
+                    separator_indices = separator_indices[:1]
+                    header_idx = separator_indices[0]
+                else:
+                    separator_indices = separator_indices[1:][::-1]
 
-            separator = terminal.separator_symbol * terminal.length(lines[0])
-            for idx in separator_indices:
-                lines.insert(idx, separator)
+                # Make a separator: insert delimiters at correct (sequence-wise!) place
+                l0 = terminal.rjust(terminal.strip(lines[0]), terminal.length(lines[0]))
+                separator = []
+                start, jdx = 0, l0.find('┃')
+                while jdx != -1:
+                    separator.append(terminal.separator_symbol * terminal.length(l0[start:jdx]))
+                    start = jdx + 1
+                    jdx = l0.find('┃', start)
+                separator.append(terminal.separator_symbol * terminal.length(l0[start:]))
+                separator = '┃'.join(separator)
+                header_separator = separator.replace(terminal.separator_symbol, terminal.bold + '-' + terminal.normal)
+
+                for idx in separator_indices:
+                    sep = separator if idx != header_idx else header_separator
+                    lines.insert(idx, sep)
 
         return lines
 

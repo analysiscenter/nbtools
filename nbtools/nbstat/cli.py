@@ -6,7 +6,7 @@ import sys
 import traceback
 from inspect import cleandoc
 from time import time
-from argparse import ArgumentParser, RawTextHelpFormatter
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
 from blessed import Terminal
 
@@ -62,15 +62,19 @@ def output_once(inspector, name, formatter, view_args):
 def output_looped(inspector, name, formatter, view_args,
                   other_name, other_formatter, other_view_args, interval=0.5):
     """ Output visualization to a stdout once each `interval` seconds in a fullscreen mode. """
+    #pylint: disable=too-many-statements
     terminal = Terminal()
 
     initial_view_args = dict(view_args)
     initial_other_view_args = dict(other_view_args)
+    initial_formatter = formatter.copy()
+    initial_other_formatter = other_formatter.copy()
 
-    with terminal.cbreak(), terminal.fullscreen():
+    with terminal.fullscreen(), terminal.cbreak(), terminal.hidden_cursor():
         try: # catches keyboard interrupts to exit gracefully
             counter = 0
             prev_len = 0
+            force_clear = False
 
             while True:
                 counter += 1
@@ -80,16 +84,19 @@ def output_looped(inspector, name, formatter, view_args,
                     start_time = time()
                     view = inspector.get_view(name=name, formatter=formatter, **view_args)
                     current_len = true_len(view)
+                    view_args['vertical_change'] = 0
 
                     # Select starting position: if needed, redraw the entire screen, otherwise just move cursor position
-                    if abs(current_len - prev_len) > 100:
+                    if abs(current_len - prev_len) > 100 or force_clear or (counter % 100 == 0):
                         start_position = terminal.clear
+                        force_clear = False
+                        counter = 0
                     else:
                         start_position = terminal.move(0, 0)
                     prev_len = current_len
 
                     # Actual print
-                    print(start_position, view, ' ', terminal.clear_eol, sep='')
+                    print(start_position, view, sep='', end='', flush=True)
 
                     # Wait for the input key
                     remaining_time = interval - (time() - start_time)
@@ -108,36 +115,89 @@ def output_looped(inspector, name, formatter, view_args,
                             formatter, other_formatter = other_formatter, formatter
                             view_args, other_view_args = other_view_args, view_args
                             initial_view_args, initial_other_view_args = initial_other_view_args, initial_view_args
+                            initial_formatter, initial_other_formatter = initial_other_formatter, initial_formatter
 
+                        # Additional lines. TODO: a separate screen with textual help...?
+                        elif inkey == 'f':
+                            view_args['add_footnote'] = not view_args['add_footnote']
+                        elif inkey == 'h':
+                            view_args['add_help'] = not view_args['add_help']
+
+                        # General controls
                         elif inkey == 's':
                             view_args['separate_index'] = not view_args['separate_index']
+                        elif inkey == 'S':
+                            view_args['separate_header'] = not view_args['separate_header']
+                            view_args['separate_table'] = not view_args['separate_table']
                         elif inkey == 'r':
                             view_args = dict(initial_view_args)
+                            formatter = initial_formatter.copy()
                         elif inkey == 'b':
                             formatter.toggle_bars()
                         elif inkey == 'm':
                             if formatter[Resource.DEVICE_UTIL]:
                                 formatter[Resource.DEVICE_UTIL_MA] = not formatter[Resource.DEVICE_UTIL_MA]
-                        elif inkey.code == 265:
+                        elif inkey == 'v':
+                            view_args['verbose'] = 2 - view_args['verbose'] # toggle between `0` and `2`
+
+                        # F1-F4: regular stats
+                        elif inkey.code == terminal.KEY_F1:
                             formatter[Resource.PID] = not formatter[Resource.PID]
-                        elif inkey.code == 266:
+                        elif inkey.code == terminal.KEY_F2:
+                            formatter[Resource.PPID] = not formatter[Resource.PPID]
+                        elif inkey.code == terminal.KEY_F3:
                             formatter[Resource.CPU] = not formatter[Resource.CPU]
-                        elif inkey.code == 267:
+                        elif inkey.code == terminal.KEY_F4:
+                            formatter[Resource.RSS] = not formatter[Resource.RSS]
+
+                        # F5-F8: device stats
+                        elif inkey.code == terminal.KEY_F5:
+                            if Resource.DEVICE_SHORT_ID in formatter:
+                                formatter[Resource.DEVICE_SHORT_ID] = not formatter[Resource.DEVICE_SHORT_ID]
+                            if Resource.DEVICE_ID in formatter:
+                                formatter[Resource.DEVICE_ID] = not formatter[Resource.DEVICE_ID]
+                        elif inkey.code == terminal.KEY_F6:
+                            formatter[Resource.DEVICE_PROCESS_MEMORY_USED] = \
+                                not formatter[Resource.DEVICE_PROCESS_MEMORY_USED]
+                        elif inkey.code == terminal.KEY_F7:
+                            formatter[Resource.DEVICE_UTIL] = not formatter[Resource.DEVICE_UTIL]
+                        elif inkey.code == terminal.KEY_F8:
+                            formatter[Resource.DEVICE_TEMP] = not formatter[Resource.DEVICE_TEMP]
+
+                        # shift F1-F4
+                        elif inkey.code == terminal.KEY_F13:
                             formatter[Resource.TYPE] = not formatter[Resource.TYPE]
+                        elif inkey.code == terminal.KEY_F14:
+                            formatter[Resource.STATUS] = not formatter[Resource.STATUS]
+                        elif inkey.code == terminal.KEY_F15:
+                            formatter[Resource.CREATE_TIME] = not formatter[Resource.CREATE_TIME]
+                        elif inkey.code == terminal.KEY_F16:
+                            formatter[Resource.PATH] = not formatter[Resource.PATH]
+
+                        # Vertical scroll
+                        elif inkey.code == terminal.KEY_DOWN:
+                            view_args['vertical_change'] = +1
+                        elif inkey.code == terminal.KEY_UP:
+                            view_args['vertical_change'] = -1
+                        elif inkey.code == terminal.KEY_PGDOWN:
+                            view_args['vertical_change'] = +terminal.height // 2
+                        elif inkey.code == terminal.KEY_PGUP:
+                            view_args['vertical_change'] = -terminal.height // 2
+
                         elif inkey == 'q':
                             raise KeyboardInterrupt
                         else:
                             recognized = False
 
                         if recognized:
-                            view = inspector.get_view(name=name, formatter=formatter, **view_args)
-                            print(terminal.clear, view, ' ', terminal.clear_eol, sep='')
+                            force_clear = True
                         else:
-                            print(f'Unrecognized key={inkey}, code={inkey.code}.')
+                            print(f'\nUnrecognized key={inkey}, code={inkey.code}.')
 
-                except Exception: # pylint: disable=broad-except
+                except Exception as e: # pylint: disable=broad-except
                     sys.stderr.write(traceback.format_exc())
                     sys.stderr.write('Error on getting system information!')
+                    sys.stderr.write(str(e))
                     sys.exit(1)
 
         except KeyboardInterrupt:
@@ -192,13 +252,16 @@ DEFAULTS = {
     'hide' : [],
     'hide_similar' : True,
 
-    'add_supheader' : True,
     'add_header' : True,
     'add_footnote' : False,
+    'add_help': False,
 
-    'separate_supheader' : False,
-    'separate_header' : True,
-    'separate_index' : True,
+    'use_cache': False,
+    'vertical_change': 0,
+
+    'separate_header': True,
+    'separate_index': True,
+    'separate_table': True,
 
     'force_styling' : True,
     'process_memory_format' : 'GB',
@@ -206,7 +269,7 @@ DEFAULTS = {
 }
 
 def make_parameters(name):
-    """ Parse parameters from command line into dictionary.
+    """ Parse parameters from the command line into a dictionary.
     Use `store_const` instad of `store_true` to keep `None` values, if not passed explicitly
     """
     # Set defaults
@@ -215,7 +278,7 @@ def make_parameters(name):
         defaults.update({'separate_index' : False,})
 
     if 'watch' in name:
-        defaults.update({'add_footnote' : True})
+        defaults.update({'use_cache': True, 'add_footnote': True, 'add_help': True})
 
     # Fetch formatter: used to tell which columns can be shown/hidden from the table in documentation
     view = NAME_TO_VIEW[name]
@@ -231,19 +294,15 @@ def make_parameters(name):
     docstring = cleandoc(globals()[name].__doc__)
     help_verbose_0 = 'Default `verbose=0` shows only script/notebooks that use devices.' if 'nb' in name else ''
     help_watch = '\nSet `interval` to continuously update displayed table.' if 'watch' not in name else '\n'
-    help_keystrokes = (
-        'While in the `watch` mode, you can use keystrokes to modify displayed view:'
-        '\n  - `tab` — swaps views, from `nbwatch` to `devicewatch` and back.'
-        '\n  - `b` — toggles bar representation for some of the resources: in addition to its value, show colored bar.'
-        '\n  - `m` — toggles moving averages for some of the resources: values are averaged across the last iterations.'
-        '\n  - `s` — toggles table separators.')
+    help_keystrokes = ('While in the `watch` mode, you can use keystrokes to modify the displayed view. '
+                       'Hit `h` to toggle help.')
     parser = ArgumentParser(description='\n'.join([docstring, help_verbose_0, help_watch, help_keystrokes]),
-                            formatter_class=RawTextHelpFormatter)
+                            formatter_class=RawDescriptionHelpFormatter)
     linesep = '\n '
 
     # Positional argument: filtering condition on index
     parser.add_argument('index_condition', nargs='?',
-                        help=('Regular expression for filtering entries in the table index. '
+                        help=('Regular expression for filtering processes, applied to their path. '
                               'For example, `.*.ipynb` allows to look only at Jupyter Notebooks.'))
 
     # NB-specific argument: verbosity
@@ -260,7 +319,7 @@ def make_parameters(name):
     else:
         help_interval = ('If provided, then the watch mode is used. '
                          'Value sets the interval (in seconds) between table updates.')
-    parser.add_argument('-i', '--interval', '-n', '--watch', nargs='?', type=float, help=help_interval)
+    parser.add_argument('-i', '--interval', nargs='?', type=float, help=help_interval)
 
     help_window = 'Number of table updates to use for computing moving averages.'
     parser.add_argument('-w', '--window', nargs='?', type=int, help=help_window + linesep)
@@ -281,20 +340,22 @@ def make_parameters(name):
     help_hidable = f'By default, parts of rows with the same values as in previous row are hidden. {help_changeable}'
     parser.add_argument('--show-similar', action='store_const', const=False, dest='hide_similar', help=help_hidable)
 
-    parser.add_argument('--hide-supheader', action='store_const', const=False, dest='add_supheader',
-                        help=f'By default, we show current time, driver and CUDA versions. {help_changeable}')
     parser.add_argument('--hide-header', action='store_const', const=False, dest='add_header',
                         help=f'By default, we show a row with column names in the table. {help_changeable}')
 
     if 'watch' in name:
         parser.add_argument('--hide-footnote', action='store_const', const=False, dest='add_footnote',
-                            help=f'By default, we show a row with total resource usage. {help_changeable}{linesep}')
+                            help=f'By default, we show info about resource usage. {help_changeable}{linesep}')
+        parser.add_argument('--hide-help', action='store_const', const=False, dest='add_help',
+                            help=f'By default, we show valid key strokes. {help_changeable}{linesep}')
     else:
         parser.add_argument('--show-footnote', action='store_const', const=True, dest='add_footnote',
-                            help=f'Show a row with total system resource usage. {linesep}')
+                            help=f'Show info about resource usage. {linesep}')
+        parser.add_argument('--show-help', action='store_const', const=True, dest='add_footnote',
+                            help=f'Show valid key strokes. {linesep}')
 
     parser.add_argument('--process-memory-format', type=str, default='GB',
-                        help='Units of measurements for non-device memory stats, `GB` by default.')
+                        help='Units of measurements for non-device memory stats like RSS, `GB` by default.')
     parser.add_argument('--device-memory-format', type=str,
                         help='Units of measurements for device memory stats, `MB` by default.' + linesep)
 
@@ -315,7 +376,7 @@ def make_parameters(name):
     # Update
     separators = args.pop('separators')
     if separators is not None:
-        for key in ['separate_supheader', 'separate_header', 'separate_index']:
+        for key in ['separate_header', 'separate_index', 'separate_footnote']:
             args[key] = separators
 
     if args.pop('hide_all'):

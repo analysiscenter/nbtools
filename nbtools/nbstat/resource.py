@@ -78,6 +78,7 @@ class Resource(Enum):
     DEVICE_PROCESS_N = auto()
     DEVICE_PROCESS_PID = 'device_pid'
     DEVICE_PROCESS_MEMORY_USED = 'process_memory'
+    DEVICE_PROCESS_MEMORY_USED_ = auto()
 
     # Used for better repr in formatter tables
     TABLE_DELIMITER1 = auto()
@@ -114,8 +115,8 @@ class Resource(Enum):
         if self == Resource.NAME:
             style = terminal.bold
             string = 'PROCESS NAME'
-        elif self in [Resource.TYPE, Resource.PID, Resource.PYTHON_PPID,
-                          Resource.STATUS, Resource.CREATE_TIME, Resource.KERNEL]:
+        elif self in [Resource.TYPE, Resource.PID, Resource.PPID, Resource.PYTHON_PPID,
+                      Resource.STATUS, Resource.CREATE_TIME, Resource.KERNEL]:
             style = terminal.normal
 
         # Process resources
@@ -133,10 +134,9 @@ class Resource(Enum):
             string = 'DEVICE PID'
 
         # Device resources
-        elif self == Resource.DEVICE_MEMORY_USED:
-            style = terminal.yellow
-        elif self == Resource.DEVICE_PROCESS_MEMORY_USED:
-            style = terminal.yellow
+        elif self in [Resource.DEVICE_MEMORY_USED,
+                      Resource.DEVICE_PROCESS_MEMORY_USED, Resource.DEVICE_PROCESS_MEMORY_USED_]:
+            style = terminal.gold2
         elif self == Resource.DEVICE_POWER_USED:
             style = terminal.magenta
         elif self in [Resource.DEVICE_UTIL]:
@@ -144,7 +144,7 @@ class Resource(Enum):
             string = 'UTIL'
         elif self in [Resource.DEVICE_UTIL_MA]:
             style = terminal.green
-            string = 'UTIL AVERAGE'
+            string = 'AVG UTIL'
         elif self == Resource.DEVICE_TEMP:
             style = terminal.red
 
@@ -152,13 +152,13 @@ class Resource(Enum):
         elif self == Resource.TABLE_DELIMITER1:
             string = '┃'
         elif self == Resource.TABLE_DELIMITER2:
-            string = '║'
+            string = '┃┃'
 
         # Default values
         if style is None:
             style = ''
         if string is None:
-            string = self.name.replace('', '').replace('DEVICE_', '').replace('_USED', '').replace('_', ' ')
+            string = self.name.replace('', '').replace('DEVICE_', '').replace('_USED', '').replace('_', ' ').strip()
         return style, string
 
 

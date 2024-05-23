@@ -8,7 +8,7 @@ from .resource import Resource
 
 class ResourceFormatter(list):
     """ An ordered sequence to define which resources to request from the system, as well as
-    how to structure them into formatted table.
+    how to structure them into a formatted table.
 
     Each element is a dictionary with mandatory `resource` and `include` keys, and defines whether this
     `resource` must be fetched/included in the table based on the value of `include` flag.
@@ -50,11 +50,14 @@ class ResourceFormatter(list):
 
     def __contains__(self, key):
         """ Overloaded `in` operator. """
-        try:
-            _ = self[key]
-            return True
-        except KeyError:
+        if isinstance(key, Resource):
+            for entry in self:
+                if entry['resource'] is key:
+                    return True
             return False
+        if isinstance(key, str):
+            return Resource.parse_alias(key) in self
+        return False
 
     def __setitem__(self, key, value):
         """ If `key` is a resource (or an alias), set the values of `include` flag for this resource. """
@@ -83,7 +86,7 @@ class ResourceFormatter(list):
             self.extend(other)
 
     def copy(self):
-        """ Deep copy of the formatter. Used to not mess up the original formatter. """
+        """ Deep copy of the formatter. Used to avoid messing up the original formatter. """
         return deepcopy(self)
 
     def include_all(self):
@@ -93,7 +96,7 @@ class ResourceFormatter(list):
 
     @property
     def included_only(self):
-        """ Return formatter with elements which `include` flag is set to True.
+        """ Return the formatter, including only the elements where the `include` flag is set to True.
         Also removes subsequent duplicates of table delimiters.
         """
         formatter = []
@@ -142,8 +145,6 @@ class ResourceFormatter(list):
 NBSTAT_FORMATTER = ResourceFormatter([
     # Notebook/script name
     {'resource' : Resource.NAME, 'include' : True, 'hidable': True},
-    {'resource' : Resource.PATH, 'include' : False, 'hidable': True},
-    {'resource' : Resource.CMDLINE, 'include' : False, 'hidable': True},
 
     # Process info
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
@@ -161,11 +162,11 @@ NBSTAT_FORMATTER = ResourceFormatter([
 
     # Process resource usage
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
-    {'resource' : Resource.CPU, 'include' : False, 'min_width' : 5},
+    {'resource' : Resource.CPU, 'include' : True, 'min_width' : 5},
     {'resource' : Resource.RSS, 'include' : True, 'min_width' : 8},
 
     # Process device usage
-    {'resource' : Resource.TABLE_DELIMITER2, 'include' : True},
+    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
     {'resource' : Resource.DEVICE_SHORT_ID, 'include' : True},
     {'resource' : Resource.DEVICE_PROCESS_PID, 'include' : False},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
@@ -177,6 +178,11 @@ NBSTAT_FORMATTER = ResourceFormatter([
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
     {'resource' : Resource.DEVICE_POWER_USED, 'include' : False},
     {'resource' : Resource.DEVICE_FAN, 'include' : False, 'min_width' : 4},
+    {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
+
+    # Hidden
+    {'resource' : Resource.PATH, 'include' : False, 'hidable': True},
+    {'resource' : Resource.CMDLINE, 'include' : False, 'hidable': True},
 ])
 
 
@@ -197,7 +203,6 @@ DEVICESTAT_FORMATTER = ResourceFormatter([
 
     # Notebook/script name
     {'resource' : Resource.NAME, 'include' : True},
-    {'resource' : Resource.CMDLINE, 'include' : False, 'hidable': True},
     {'resource' : Resource.TABLE_DELIMITER1, 'include' : True},
 
     # Process info
@@ -217,6 +222,9 @@ DEVICESTAT_FORMATTER = ResourceFormatter([
     {'resource' : Resource.CPU, 'include' : False, 'min_width' : 5},
     {'resource' : Resource.RSS, 'include' : False, 'min_width' : 10},
 
+    # Hidden
+    {'resource' : Resource.PATH, 'include' : False, 'hidable': True},
+    {'resource' : Resource.CMDLINE, 'include' : False, 'hidable': True},
 ])
 
 
