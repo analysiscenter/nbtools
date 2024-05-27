@@ -28,12 +28,11 @@ RUN_NOTEBOOK_PATH_SEARCHER = re.compile('/tmp/.*.json.*--HistoryManager.hist_fil
 class ResourceInspector:
     """ A class to controll the process of gathering information about system resources into ResourceTables,
     merging them into views, and formatting into nice colored strings.
-
-    TODO: correct working with VSCode Jupyter Notebooks
-    TODO: make sure that everything works without sudo
-    TODO: add more fallbacks for unavailable resources
-    TODO: can add explicit __delete__ to call nvidia_smi.nvmlShutdown(), if we ever have problems with that
     """
+    # TODO: correct working with VSCode Jupyter Notebooks
+    # TODO: make sure that everything works without sudo
+    # TODO: add more fallbacks for unavailable resources
+    # TODO: can add explicit __delete__ to call nvidia_smi.nvmlShutdown(), if we ever have problems with that
     def __init__(self, formatter=None):
         self.formatter = formatter
 
