@@ -259,8 +259,8 @@ def exec_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_
                 out_path_db = os.path.splitext(out_path_ipynb)[0] + '_db'
             else:
                 error_message = """\
-                                Invalid value for ``out_path_db`` argument. If ``inputs`` or ``outputs`` are provided,
-                                then you need to provide ``out_path_db`` or ``out_path_ipynb`` arguments."""
+                                Invalid value for `out_path_db` argument. If `inputs` or `outputs` are provided,
+                                then you need to provide `out_path_db` or `out_path_ipynb` arguments."""
                 error_message = dedent(error_message)
                 raise ValueError(error_message)
 
