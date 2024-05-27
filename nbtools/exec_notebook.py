@@ -186,11 +186,12 @@ def exec_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_
     display_inputs : bool, optional
         Whether to display ``inputs`` or not.
         Under the hood, inputs are provided using a shelve database. If ``display_inputs=True``, variables will be
-        inserted in the cell in the following manner: ``input_name = input_value``, instead of importing code from shelve.
+        inserted in the cell in the following manner: ``input_name = input_value``, instead of importing code from
+        shelve.
     display_outputs : bool, optional
         Whether to display ``outputs`` or not.
-        Under the hood, outputs are saved using a shelve database. If ``display_outputs=True``, variables will be shown in
-        the last cell in the following manner: ``print(input_name)``, instead of dumping code into the database.
+        Under the hood, outputs are saved using a shelve database. If ``display_outputs=True``, variables will be shown
+        in the last cell in the following manner: ``print(input_name)``, instead of dumping code into the database.
     working_dir : str
         The working directory of starting the kernel.
     out_path_db : str, optional
