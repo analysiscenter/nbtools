@@ -53,4 +53,7 @@ html_theme_options = {
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
     'python': ('https://docs.python.org/', None),
+    'nbconvert': ('https://nbconvert.readthedocs.io/en/latest', None),
+    'nbclient': ('https://nbclient.readthedocs.io/en/latest', None),
+    'nbformat': ('https://nbformat.readthedocs.io/en/latest/', None)
 }

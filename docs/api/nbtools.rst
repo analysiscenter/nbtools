@@ -1,40 +1,22 @@
-nbtools package
-===============
+API reference
+=========
 
-
-.. toctree::
-   :maxdepth: 4
-
-   nbtools.nbstat
-
-core
--------------------
-
-.. automodule:: nbtools.core
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-nbtools.exec\_notebook module
------------------------------
+Jupyter Notebooks: linting and execution
+**************
 
 .. automodule:: nbtools.exec_notebook
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-nbtools.pylint\_notebook module
--------------------------------
+   :members: exec_notebook, extract_traceback, run_in_process
 
 .. automodule:: nbtools.pylint_notebook
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   :members: pylint_notebook
 
-Module contents
----------------
+GPU utils for notebooks
+**************
 
-.. automodule:: nbtools
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. automodule:: nbtools.core
+   :members: free_gpus, get_available_gpus, get_gpu_free_memory, set_gpus
+
+nbstat tools
+**************
+
+.. autoclass:: nbtools.nbstat.resource_inspector.ResourceInspector

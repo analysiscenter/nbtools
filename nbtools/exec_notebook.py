@@ -16,7 +16,7 @@ os.makedirs(TMP_DIR, exist_ok=True)
 
 # Decorator
 def run_in_process(func):
-    """ Decorator to run the `func` in a separate process for terminating all related processes properly. """
+    """ Decorator to run the ``func`` in a separate process for terminating all related processes properly. """
     @wraps(func)
     def _wrapper(*args, **kwargs):
         # pylint: disable=broad-exception-caught, broad-exception-raised
@@ -62,7 +62,7 @@ def run_in_process(func):
 def get_exec_notebook_name(pid):
     """ Get the notebook name by its pid.
 
-    Under the hood, the function checks the /tmp/ directory for logs of running `exec_notebook` executors and extract
+    Under the hood, the function checks the /tmp/ directory for logs of running ``exec_notebook`` executors and extract
     the name for the provided pid.
     """
     json_path = f'{TMP_DIR}/{pid}.json'
@@ -146,75 +146,73 @@ def exec_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_
     """ Execute a Jupyter Notebook programmatically.
     Heavily inspired by https://github.com/tritemio/nbrun.
 
-    Intended to be an analog of `exec`, providing a way to inject / extract variables from the execution.
-    For a detailed description of how to do that, check the `inputs` and `outputs` parameters.
-    The executed notebook is optionally saved to disk as `.ipynb` / `.html` file: we strongly recommend always doing so.
+    Intended to be an analog of ``exec``, providing a way to inject / extract variables from the execution.
+    For a detailed description of how to do that, check the ``inputs`` and ``outputs`` parameters.
+    The executed notebook is optionally saved to disk as ``.ipynb`` / ``.html`` file: we strongly recommend always
+    doing so.
 
-    The `raise_exception` flag defines the behavior if the execution of the notebook fails due to an exception.
+    The ``raise_exception`` flag defines the behavior if the execution of the notebook fails due to an exception.
 
     Under the hood, this function does the following:
-        - Create an internal database to communicate variables (both `inputs` and `outputs`). Save `inputs` to it.
-        - Add a cell for reading `inputs` from the internal database, add a cell for saving `outputs` to it.
-        - Execute notebook.
-        - Handle exceptions.
-        - Read `outputs` from the database.
-        - Add a timestamp cell to the notebook, if needed.
-        - Save the executed notebook as `.ipynb` and / or `.html`.
-        - Return a dictionary with intermediate results, execution info and values of `outputs` variables.
+        * Create an internal database to communicate variables (both ``inputs`` and ``outputs``). Save ``inputs`` to it.
+        * Add a cell for reading ``inputs`` from the internal database, add a cell for saving ``outputs`` to it.
+        * Execute notebook.
+        * Handle exceptions.
+        * Read ``outputs`` from the database.
+        * Add a timestamp cell to the notebook, if needed.
+        * Save the executed notebook as ``.ipynb`` and / or ``.html``.
+        * Return a dictionary with intermediate results, execution info and values of ``outputs`` variables.
 
-    If there are no `inputs` or `outputs`, a database is not created and additional cells are not inserted.
-    Note, if either of them is provided, then one of `out_path_ipynb` or `out_path_db` must be explicitly defined.
+    If there are no ``inputs`` or ``outputs``, a database is not created and additional cells are not inserted.
+    Note, if either of them is provided, then one of ``out_path_ipynb`` or ``out_path_db`` must be explicitly defined.
 
     Parameters
     ----------
     path : str
         Path to the notebook to execute.
     inputs : dict, optional
-        Inputs for execution are essentially equivalent to notebook `globals`.
+        Inputs for execution are essentially equivalent to notebook ``globals``.
         Must be a dictionary with variable names and their values; therefore, keys must be valid Python identifiers.
         Under the hood, inputs are saved into a database, loaded in the notebook in a separate cell, that is inserted at
-        the `inputs_pos` position. Therefore, values must be serializable.
+        the ``inputs_pos`` position. Therefore, values must be serializable.
     outputs : str or iterable of str, optional
         The list of variable names to return from the notebook.
         Extracted from the notebook in a separate cell, which is inserted at the last position.
         Note, if some of the variables don't exist, no errors are raised.
     inputs_pos : int, optional
-        Position to insert the cell with `inputs` loading into the notebook.
+        Position to insert the cell with ``inputs`` loading into the notebook.
     replace_inputs_pos : int, optional
-        Whether to replace `inputs_pos` code cell with `inputs` or insert a new one.
+        Whether to replace ``inputs_pos`` code cell with ``inputs`` or insert a new one.
     display_inputs : bool, optional
-        Whether to display `inputs` or not.
-        Under the hood, inputs are provided using a shelve database. If `display_inputs=True`, variables will be
-        inserted in the cell in the following manner: `input_name = input_value`, instead of importing code from shelve.
-        For more, see the :func:`~._display_inputs_reading` docstring.
+        Whether to display ``inputs`` or not.
+        Under the hood, inputs are provided using a shelve database. If ``display_inputs=True``, variables will be
+        inserted in the cell in the following manner: ``input_name = input_value``, instead of importing code from shelve.
     display_outputs : bool, optional
-        Whether to display `outputs` or not.
-        Under the hood, outputs are saved using a shelve database. If `display_outputs=True`, variables will be shown in
-        the last cell in the following manner: `print(input_name)`, instead of dumping code into the database.
-        For more, see the :func:`~._display_outputs_dumping` docstring.
+        Whether to display ``outputs`` or not.
+        Under the hood, outputs are saved using a shelve database. If ``display_outputs=True``, variables will be shown in
+        the last cell in the following manner: ``print(input_name)``, instead of dumping code into the database.
     working_dir : str
         The working directory of starting the kernel.
     out_path_db : str, optional
         Path to save the internal database files (without file extension).
-        If not provided, then it is inferred from `out_path_ipynb`.
+        If not provided, then it is inferred from ``out_path_ipynb``.
     out_path_ipynb : str, optional
         Path to save the output ipynb file.
     out_path_html : str, optional
         Path to save the output html file.
     remove_db : str, optional
         Whether to remove the internal database after notebook execution.
-        Possible options are: 'always', 'not_failed_case' or 'never'.
-        If 'always', then remove the database after notebook execution.
-        If 'not_failed_case', then remove the database if there wasn't any execution failure.
-        If 'never', then don't remove the database after notebook execution.
-        Running `:func:exec_notebook` with the 'not_failed_case' or 'never' option helps to reproduce failures
-        in the `out_path_ipynb` notebook: it will take the inputs from the saved shelve database.
+        Possible options are:
+            - ``'always'``: remove the database after notebook execution
+            - ``'not_failed_case'``: remove the database if there wasn't any execution failure
+            - ``'never'``: don't remove the database after notebook execution
+        Running :func:`~.exec_notebook` with the ``'not_failed_case'`` or ``'never'`` option helps to reproduce failures
+        in the ``out_path_ipynb`` notebook: it will take the inputs from the saved shelve database.
         Note, that the database exists only if inputs and / or outputs are provided.
     execute_kwargs : dict, optional
-        Parameters of `:class:ExecutePreprocessor`.
-        For example, you can provide timeout, kernel_name, resources (such as metadata)
-        and other `nbclient.client.NotebookClient` arguments from :ref:`the NotebookClient doc page
-        <https://nbclient.readthedocs.io/en/latest/reference/nbclient.html#nbclient.client.NotebookClient>`.
+        Parameters of :class:`nbconvert.preprocessors.ExecutePreprocessor`.
+        For example, you can provide ``timeout``, ``kernel_name``, ``resources`` (such as metadata)
+        and other :class:`nbclient.client.NotebookClient` arguments.
     add_timestamp : bool, optional
         Whether to add a cell with execution information at the beginning of the saved notebook.
     hide_code_cells : bool, optional
@@ -233,18 +231,18 @@ def exec_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_
     exec_res : dict
         Dictionary with the notebook execution results.
         It provides the following information:
-        - 'failed' : bool
-           Whether the notebook execution failed.
-        - 'outputs' : dict
-           Saved notebook local variables.
-           Is not presented in `exec_res` dict, if `outputs` argument is None.
-        - 'failed cell number': int
-           An error cell execution number (if notebook failed).
-        - 'traceback' : str
-           Traceback message from the notebook (if notebook failed).
-        - 'notebook' : :class:`nbformat.notebooknode.NotebookNode`, optional
-           Executed notebook object.
-           Note that this output is provided only if `return_notebook` is True.
+
+            - ``'failed'`` : ``bool``
+                Whether the notebook execution failed.
+            - ``'outputs'`` : ``dict``
+                Saved notebook local variables. Is not presented in ``exec_res`` dict, if ``outputs``
+                argument is ``None.``
+            - ``'failed cell number'`` : ``int``
+                An error cell execution number (if notebook failed).
+            - ``'traceback'`` : ``str``
+                Traceback message from the notebook (if notebook failed).
+            - ``'notebook'`` : :class:`nbformat.notebooknode.NotebookNode`, optional
+                Executed notebook object. Note that this output is provided only if ``return_notebook`` is ``True``.
     """
     # pylint: disable=bare-except, lost-exception, return-in-finally
     import nbformat
@@ -260,8 +258,8 @@ def exec_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_
                 out_path_db = os.path.splitext(out_path_ipynb)[0] + '_db'
             else:
                 error_message = """\
-                                Invalid value for `out_path_db` argument. If `inputs` or `outputs` are provided,
-                                then you need to provide `out_path_db` or `out_path_ipynb` arguments."""
+                                Invalid value for ``out_path_db`` argument. If ``inputs`` or ``outputs`` are provided,
+                                then you need to provide ``out_path_db`` or ``out_path_ipynb`` arguments."""
                 error_message = dedent(error_message)
                 raise ValueError(error_message)
 
@@ -458,7 +456,7 @@ def _display_outputs_dumping(notebook, pos):
 
 # Save notebook functions
 def save_notebook(notebook, out_path_ipynb, display_link):
-    """ Save an instance of :class:`nbformat.notebooknode.NotebookNode` as ipynb file."""
+    """ Save an instance of :class:``nbformat.notebooknode.NotebookNode`` as ipynb file."""
     import nbformat
     from IPython.display import display, FileLink
 
@@ -470,7 +468,7 @@ def save_notebook(notebook, out_path_ipynb, display_link):
         display(FileLink(out_path_ipynb))
 
 def notebook_to_html(notebook, out_path_html, display_link):
-    """ Save an instance of :class:`nbformat.notebooknode.NotebookNode` as html file."""
+    """ Save an instance of :class:``nbformat.notebooknode.NotebookNode`` as html file."""
     from nbconvert import HTMLExporter
     from IPython.display import display, FileLink
 
@@ -496,13 +494,15 @@ def extract_traceback(notebook):
 
     Returns
     -------
-    bool
-        Whether the executed notebook has an error traceback.
-    int or None
-        Number of a cell with a traceback.
-        If None, then the notebook doesn't contain an error traceback.
-    str
-        Error traceback if exists.
+    tuple
+        Tuple of three elements:
+        - ``bool``
+            Whether the executed notebook has an error traceback.
+        - ``int`` or ``None``
+            Number of a cell with a traceback.
+            If ``None``, then the notebook doesn't contain an error traceback.
+        - ``str``
+            Error traceback if exists.
     """
     for cell in notebook['cells']:
         # Find a cell output with a traceback and extract the traceback
