@@ -497,6 +497,7 @@ def extract_traceback(notebook):
     -------
     tuple
         Tuple of three elements:
+
             - ``bool``
                 Whether the executed notebook has an error traceback.
 
