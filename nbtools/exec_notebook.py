@@ -202,11 +202,11 @@ def exec_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_
     out_path_html : str, optional
         Path to save the output html file.
     remove_db : str, optional
-        Whether to remove the internal database after notebook execution.
-        Possible options are:
+        Whether to remove the internal database after notebook execution. Possible options are:
             - ``'always'``: remove the database after notebook execution
             - ``'not_failed_case'``: remove the database if there wasn't any execution failure
             - ``'never'``: don't remove the database after notebook execution
+
         Running :func:`~.exec_notebook` with the ``'not_failed_case'`` or ``'never'`` option helps to reproduce failures
         in the ``out_path_ipynb`` notebook: it will take the inputs from the saved shelve database.
         Note, that the database exists only if inputs and / or outputs are provided.
@@ -497,13 +497,16 @@ def extract_traceback(notebook):
     -------
     tuple
         Tuple of three elements:
-        - ``bool``
-            Whether the executed notebook has an error traceback.
-        - ``int`` or ``None``
-            Number of a cell with a traceback.
-            If ``None``, then the notebook doesn't contain an error traceback.
-        - ``str``
-            Error traceback if exists.
+            - ``bool``
+                Whether the executed notebook has an error traceback.
+
+            - ``int`` or ``None``
+                Number of a cell with a traceback.
+                If ``None``, then the notebook doesn't contain an error traceback.
+
+            - ``str``
+                Error traceback if exists.
+
     """
     for cell in notebook['cells']:
         # Find a cell output with a traceback and extract the traceback

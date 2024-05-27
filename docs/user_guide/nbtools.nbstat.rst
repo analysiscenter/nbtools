@@ -43,7 +43,7 @@ Main options
     * ``-V`` — verbosity level 2. Shows all processes for all notebooks.
 
 Column options
-************
+**************
 
 * ``--show a b c``, ``--hide x y z`` — show or hide columns in the table.
 
@@ -60,7 +60,7 @@ Column options
 * ``--show-all`` — display all available columns.
 
 Table options
-************
+*************
 
 * ``--show-similar`` — by default, parts of the rows are hidden if the value is the same as in the previous row. Use this parameter to change this behavior.
 * ``--hide-supheader`` — by default, we show current time, driver and CUDA versions. Use this parameter to change this behavior.
@@ -76,7 +76,7 @@ Table options
 * ``--suppress-color`` — disable using colors in the displayed view.
 
 Other options
-************
+*************
 
 * ``-i``, ``-n``, ``--interval``, ``--watch`` — continuously update information from the table in a full-screen terminal.
 
@@ -99,7 +99,7 @@ While in the ``watch`` mode, you can use keystrokes to change the displayed view
 * ``r`` — resets the behaviour to the defaults.
 
 Sort
-=========================
+====
 
 The **nbstat** table is sorted in the following way:
 
@@ -115,7 +115,7 @@ The **nbstat** table is sorted in the following way:
         * processes that do not use NVIDIA devices, sorted by starting time. Note that those processes are shown only with verbosity level >=1.
 
 Usage examples
-=========================
+==============
 
 Using plain **nbwatch** is enough to monitor your usual ML applications. In some situations, though, following snippets are helpful:
 
@@ -136,7 +136,7 @@ Sometimes, it is desired to get **nbstat** / **devicestat** information as a Pyt
 
 
 Troubleshooting: PID namespaces, user permissions and zombie processes
-=========================
+======================================================================
 
 A `known problem <https://github.com/NVIDIA/nvidia-docker/issues/179>`_ of NVIDIA drivers is that **nvidia-smi** reports PIDs of processes on devices in the global namespace, not in the container namespace, which does not allow to match PIDs of container processes to their device PIDs. There are a few workarounds:
 
@@ -155,6 +155,6 @@ In order to inspect certain properties of processes, we rely on having all neces
 
 
 Contribute
-=========================
+==========
 
 If you are interested to contribute, check out the `developer/contributor page <https://github.com/analysiscenter/nbtools/blob/master/nbtools/nbstat/DEV.md>`_. It contains detailed description about inner workings of the library, my design choices and motivation behind them, as well as discussion of complexities along the way.

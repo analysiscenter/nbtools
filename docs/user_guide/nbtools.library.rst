@@ -1,6 +1,6 @@
-=======
+========================================
 Jupyter Notebooks: linting and execution
-=======
+========================================
 
 Other than `nbstat / nbwatch` monitoring utilities, this library provides a few useful tools for working with notebooks and GPUs.
 

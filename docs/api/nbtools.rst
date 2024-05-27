@@ -1,8 +1,8 @@
-API reference
-=========
+nbtools
+=============
 
-Jupyter Notebooks: linting and execution
-**************
+Linting and execution
+****************************************
 
 .. automodule:: nbtools.exec_notebook
    :members: exec_notebook, extract_traceback, run_in_process
@@ -10,13 +10,13 @@ Jupyter Notebooks: linting and execution
 .. automodule:: nbtools.pylint_notebook
    :members: pylint_notebook
 
-GPU utils for notebooks
-**************
+GPU utils
+*********
 
 .. automodule:: nbtools.core
    :members: free_gpus, get_available_gpus, get_gpu_free_memory, set_gpus
 
-nbstat tools
-**************
+Monitoring tools
+****************
 
 .. autoclass:: nbtools.nbstat.resource_inspector.ResourceInspector
