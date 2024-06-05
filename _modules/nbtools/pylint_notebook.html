@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>nbtools.pylint_notebook &mdash; nbtools  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html">
+            
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/nbtools.html">Getting Started</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/modules.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">nbtools</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">nbtools.pylint_notebook</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for nbtools.pylint_notebook</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot; Functions for code quality control of Jupyter Notebooks. &quot;&quot;&quot;</span>
+<span class="c1">#pylint: disable=import-outside-toplevel</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">io</span> <span class="kn">import</span> <span class="n">StringIO</span>
+<span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">redirect_stderr</span><span class="p">,</span> <span class="n">redirect_stdout</span>
+
+<span class="kn">from</span> <span class="nn">.core</span> <span class="kn">import</span> <span class="n">StringWithDisabledRepr</span><span class="p">,</span> <span class="n">get_notebook_path</span><span class="p">,</span> <span class="n">notebook_to_script</span>
+
+
+
+<span class="n">PYLINTRC_TEMPLATE</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">[DESIGN]</span>
+<span class="s2">max-line-length=</span><span class="si">{max_line_length}</span>
+<span class="s2">variable-rgx=(.*[a-z][a-z0-9_]{{1,30}}|[a-z_])$ # snake_case + single letters</span>
+<span class="s2">argument-rgx=(.*[a-z][a-z0-9_]{{1,30}}|[a-z_])$ # snake_case + single letters</span>
+
+<span class="s2">[MESSAGE CONTROL]</span>
+<span class="s2">disable=too-few-public-methods, unsubscriptable-object, no-member, too-many-lines, too-many-locals,</span>
+<span class="s2">        arguments-renamed, arguments-differ, multiple-statements, invalid-name,</span>
+<span class="s2">        missing-module-docstring, missing-final-newline, redefined-outer-name,</span>
+<span class="s2">        wrong-import-position, no-name-in-module, import-error, unused-wildcard-import,</span>
+<span class="s2">        unnecessary-semicolon, trailing-whitespace, trailing-newlines,</span>
+<span class="s2">        </span><span class="si">{disable}</span>
+
+<span class="s2">good-names=bar, df, fn</span>
+<span class="s2">additional-builtins=display, get_ipython</span>
+<span class="s2">&quot;&quot;&quot;</span>
+
+
+<span class="k">def</span> <span class="nf">generate_pylintrc</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">disable</span><span class="o">=</span><span class="p">(),</span> <span class="n">enable</span><span class="o">=</span><span class="p">(),</span> <span class="n">max_line_length</span><span class="o">=</span><span class="mi">120</span><span class="p">,</span> <span class="o">**</span><span class="n">pylint_params</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Create `pylintrc` file.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    path : str</span>
+<span class="sd">        Path to save the file.</span>
+<span class="sd">    disable : sequence</span>
+<span class="sd">        Which checks to disable. Each element should be either a code or a name of the check.</span>
+<span class="sd">    enable : sequence</span>
+<span class="sd">        Which checks to enable. Each element should be either a code or a name of the check.</span>
+<span class="sd">        Has priority over `disable`.</span>
+<span class="sd">    max_line_length : int</span>
+<span class="sd">        Allowed line length.</span>
+<span class="sd">    pylint_params : dict</span>
+<span class="sd">        Additional parameter of linting. Each is converted to a separate valid entry in the `pylintrc` file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">disable</span> <span class="o">=</span> <span class="p">[</span><span class="n">disable</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">disable</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">disable</span>
+    <span class="n">enable</span> <span class="o">=</span> <span class="p">[</span><span class="n">enable</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">enable</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">enable</span>
+    <span class="n">disable</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">,</span> <span class="s1">&#39;-&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">disable</span><span class="p">]</span>
+    <span class="n">enable</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">,</span> <span class="s1">&#39;-&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">enable</span><span class="p">]</span>
+
+    <span class="n">pylintrc</span> <span class="o">=</span> <span class="n">PYLINTRC_TEMPLATE</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">disable</span><span class="o">=</span><span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">disable</span><span class="p">),</span>
+                                        <span class="n">max_line_length</span><span class="o">=</span><span class="n">max_line_length</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">enable</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">pylintrc</span><span class="p">:</span>
+            <span class="n">pylintrc</span> <span class="o">=</span> <span class="p">(</span><span class="n">pylintrc</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+                                <span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;=, &#39;</span><span class="p">,</span> <span class="s1">&#39;=&#39;</span><span class="p">)</span>
+                                <span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;, ,&#39;</span><span class="p">,</span> <span class="s1">&#39;,&#39;</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">pylint_params</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">key</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">,</span> <span class="s1">&#39;-&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">pylintrc</span> <span class="o">+=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="se">\n</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s1">=</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s1">&#39;</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+        <span class="n">file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">pylintrc</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">pylintrc</span>
+
+
+<div class="viewcode-block" id="pylint_notebook">
+<a class="viewcode-back" href="../../api/nbtools.html#nbtools.pylint_notebook.pylint_notebook">[docs]</a>
+<span class="k">def</span> <span class="nf">pylint_notebook</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">(),</span> <span class="n">config</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">disable</span><span class="o">=</span><span class="p">(),</span> <span class="n">enable</span><span class="o">=</span><span class="p">(),</span> <span class="n">printer</span><span class="o">=</span><span class="nb">print</span><span class="p">,</span>
+                    <span class="n">remove_files</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">return_info</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">pylint_params</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Execute ``pylint`` for a provided Jupyter Notebook.</span>
+
+<span class="sd">    Under the hood, roughly does the following:</span>
+<span class="sd">        - Creates a ``.pylintrc`` file next to the ``path``, if needed.</span>
+<span class="sd">        - Converts the notebook to `.py` file next to the ``path``.</span>
+<span class="sd">        - Runs ``pylint`` with additional options.</span>
+<span class="sd">        - Create a report and display it, if needed.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    path : str, optional</span>
+<span class="sd">        Path to the Jupyter notebook. If not provided, the current notebook is used.</span>
+<span class="sd">    options : sequence</span>
+<span class="sd">        Additional options for ``pylint`` execution.</span>
+<span class="sd">    config : str, None</span>
+<span class="sd">        Path to a pylint config in the ``.pylintrc`` format.</span>
+<span class="sd">        Note, if config is not None, then `disable` and `enable` are not used.</span>
+<span class="sd">    printer : callable or None</span>
+<span class="sd">        Function to display the report.</span>
+<span class="sd">    remove_files : bool</span>
+<span class="sd">        Whether to remove ``.pylintrc`` and ``.py`` files after the execution.</span>
+<span class="sd">    return_info : bool</span>
+<span class="sd">        Whether to return a dictionary with intermediate results.</span>
+<span class="sd">        It contains the notebook code string, as well as ``pylint`` stdout and stderr.</span>
+<span class="sd">    disable : sequence</span>
+<span class="sd">        Which checks to disable. Each element should be either a code or a name of the check.</span>
+<span class="sd">    enable : sequence</span>
+<span class="sd">        Which checks to enable. Each element should be either a code or a name of the check.</span>
+<span class="sd">        Has priority over ``disable``.</span>
+<span class="sd">    max_line_length : int</span>
+<span class="sd">        Allowed line length.</span>
+<span class="sd">    pylint_params : dict</span>
+<span class="sd">        Additional parameter of linting. Each is converted to a separate valid entry in the ``.pylintrc`` file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">from</span> <span class="nn">pylint.lint</span> <span class="kn">import</span> <span class="n">Run</span>
+        <span class="kn">from</span> <span class="nn">pylint.reporters.text</span> <span class="kn">import</span> <span class="n">TextReporter</span>
+    <span class="k">except</span> <span class="ne">ImportError</span> <span class="k">as</span> <span class="n">exception</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span><span class="s1">&#39;Install pylint&#39;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">exception</span>
+
+
+    <span class="n">path</span> <span class="o">=</span> <span class="n">path</span> <span class="ow">or</span> <span class="n">get_notebook_path</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Provide path to Jupyter Notebook or run `pylint_notebook` inside of it!&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Convert notebook to a script</span>
+    <span class="n">path_script</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">path</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;.py&#39;</span>
+    <span class="n">script_name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">path_script</span><span class="p">)</span>
+
+    <span class="n">code</span><span class="p">,</span> <span class="n">cell_line_numbers</span> <span class="o">=</span> <span class="n">notebook_to_script</span><span class="p">(</span><span class="n">path_notebook</span><span class="o">=</span><span class="n">path</span><span class="p">,</span> <span class="n">path_script</span><span class="o">=</span><span class="n">path_script</span><span class="p">,</span> <span class="n">return_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+
+    <span class="c1"># Create pylintrc file</span>
+    <span class="k">if</span> <span class="n">config</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">path_pylintrc</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">path</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;.pylintrc&#39;</span>
+        <span class="n">pylintrc</span> <span class="o">=</span> <span class="n">generate_pylintrc</span><span class="p">(</span><span class="n">path_pylintrc</span><span class="p">,</span> <span class="n">disable</span><span class="o">=</span><span class="n">disable</span><span class="p">,</span> <span class="n">enable</span><span class="o">=</span><span class="n">enable</span><span class="p">,</span> <span class="o">**</span><span class="n">pylint_params</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">path_pylintrc</span> <span class="o">=</span> <span class="n">config</span>
+
+        <span class="c1"># Open config for output</span>
+        <span class="k">if</span> <span class="n">return_info</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path_pylintrc</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">rcfile</span><span class="p">:</span>
+                <span class="n">pylintrc</span> <span class="o">=</span> <span class="n">rcfile</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+
+    <span class="c1"># Run pylint on script with pylintrc configuration</span>
+    <span class="n">pylint_cmdline</span> <span class="o">=</span> <span class="p">[</span><span class="n">path_pylintrc</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;--rcfile=</span><span class="si">{</span><span class="n">path_pylintrc</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="o">*</span><span class="n">options</span><span class="p">]</span>
+
+    <span class="c1"># Run pylint and catch messagies</span>
+    <span class="k">with</span> <span class="n">redirect_stdout</span><span class="p">(</span><span class="n">StringIO</span><span class="p">())</span> <span class="k">as</span> <span class="n">pylint_stdout</span><span class="p">,</span> <span class="n">redirect_stderr</span><span class="p">(</span><span class="n">StringIO</span><span class="p">())</span> <span class="k">as</span> <span class="n">pylint_stderr</span><span class="p">:</span>
+        <span class="n">reporter</span> <span class="o">=</span> <span class="n">TextReporter</span><span class="p">(</span><span class="n">pylint_stdout</span><span class="p">)</span>
+        <span class="n">Run</span><span class="p">(</span><span class="n">pylint_cmdline</span><span class="p">,</span> <span class="n">reporter</span><span class="o">=</span><span class="n">reporter</span><span class="p">,</span> <span class="n">exit</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="n">report</span> <span class="o">=</span> <span class="n">pylint_stdout</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+        <span class="n">errors</span> <span class="o">=</span> <span class="n">pylint_stderr</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+
+    <span class="c1"># Prepare custom report</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">report</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">):</span>
+        <span class="c1"># error line is a str in the format:</span>
+        <span class="c1"># &quot;filename.py:line_num:position_num: error_code: error_text (error_name)&quot;</span>
+        <span class="k">if</span> <span class="s1">&#39;rated&#39;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+            <span class="n">output</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">))</span>
+            <span class="n">output</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;–&#39;</span> <span class="o">*</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">line</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+
+        <span class="k">elif</span> <span class="n">path_script</span> <span class="ow">in</span> <span class="n">line</span> <span class="ow">or</span> <span class="n">script_name</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+            <span class="n">line</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">path_script</span><span class="p">,</span> <span class="s1">&#39;__&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">script_name</span><span class="p">,</span> <span class="s1">&#39;__&#39;</span><span class="p">)</span>
+            <span class="n">line_semicolon_split</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)</span>
+
+            <span class="c1"># Locate the cell and line inside the cell</span>
+            <span class="n">code_line_number</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line_semicolon_split</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">cell_number</span><span class="p">,</span> <span class="n">cell_ranges</span> <span class="ow">in</span> <span class="n">cell_line_numbers</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">code_line_number</span> <span class="ow">in</span> <span class="n">cell_ranges</span><span class="p">:</span>
+                    <span class="n">cell_line_number</span> <span class="o">=</span> <span class="n">code_line_number</span> <span class="o">-</span> <span class="n">cell_ranges</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="k">break</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">cell_number</span><span class="p">,</span> <span class="n">cell_line_number</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">code_line_number</span>
+
+            <span class="c1"># Find error_code and error_name: for example, `C0123` and `invalid-name`</span>
+            <span class="n">error_code</span> <span class="o">=</span> <span class="n">line_semicolon_split</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+            <span class="n">error_message</span> <span class="o">=</span> <span class="n">line_semicolon_split</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="n">error_name_start</span>  <span class="o">=</span> <span class="n">error_message</span><span class="o">.</span><span class="n">rfind</span><span class="p">(</span><span class="s1">&#39;(&#39;</span><span class="p">)</span>
+
+            <span class="n">error_human_message</span> <span class="o">=</span> <span class="n">error_message</span><span class="p">[:</span><span class="n">error_name_start</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="n">error_name</span> <span class="o">=</span> <span class="n">error_message</span><span class="p">[</span><span class="n">error_name_start</span><span class="o">+</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+            <span class="c1"># Make new message</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;Cell </span><span class="si">{</span><span class="n">cell_number</span><span class="si">}</span><span class="s1">:</span><span class="si">{</span><span class="n">cell_line_number</span><span class="si">}</span><span class="s1">, code=</span><span class="si">{</span><span class="n">error_code</span><span class="si">}</span><span class="s1">, name=</span><span class="si">{</span><span class="n">error_name</span><span class="si">}</span><span class="s1">&#39;</span>
+            <span class="n">message</span> <span class="o">+=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">     Pylint message ::: </span><span class="si">{</span><span class="n">error_human_message</span><span class="si">}</span><span class="se">\n</span><span class="s1">&#39;</span>
+            <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+
+    <span class="n">output</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">remove_files</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">path_script</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">config</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">path_pylintrc</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">printer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">printer</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">return_info</span><span class="p">:</span>
+        <span class="n">enumerated_code</span> <span class="o">=</span> <span class="n">code</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">n_digits</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">enumerated_code</span><span class="p">)))</span>
+        <span class="n">enumerated_code</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">i</span><span class="si">:</span><span class="s1">0&gt;</span><span class="si">{</span><span class="n">n_digits</span><span class="si">}}</span><span class="s1">    &#39;</span> <span class="o">+</span> <span class="n">item</span>
+                           <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">item</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">enumerated_code</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span>
+        <span class="n">enumerated_code</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">enumerated_code</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;report&#39;</span> <span class="p">:</span> <span class="n">StringWithDisabledRepr</span><span class="p">(</span><span class="n">output</span><span class="p">),</span>
+
+            <span class="s1">&#39;code&#39;</span> <span class="p">:</span> <span class="n">StringWithDisabledRepr</span><span class="p">(</span><span class="n">code</span><span class="p">),</span>
+            <span class="s1">&#39;enumerated_code&#39;</span> <span class="p">:</span> <span class="n">StringWithDisabledRepr</span><span class="p">(</span><span class="n">enumerated_code</span><span class="p">),</span>
+
+            <span class="s1">&#39;pylintrc&#39;</span> <span class="p">:</span> <span class="n">StringWithDisabledRepr</span><span class="p">(</span><span class="n">pylintrc</span><span class="p">),</span>
+            <span class="s1">&#39;pylint_errors&#39;</span> <span class="p">:</span> <span class="n">StringWithDisabledRepr</span><span class="p">(</span><span class="n">errors</span><span class="p">),</span>
+            <span class="s1">&#39;pylint_report&#39;</span> <span class="p">:</span> <span class="n">StringWithDisabledRepr</span><span class="p">(</span><span class="n">report</span><span class="p">),</span>
+        <span class="p">}</span>
+    <span class="k">return</span> <span class="kc">None</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Analysis Center.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

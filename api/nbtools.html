@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>nbtools &mdash; nbtools  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="API reference" href="modules.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html">
+            
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/nbtools.html">Getting Started</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">API reference</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">nbtools</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">nbtools</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">API reference</a></li>
+      <li class="breadcrumb-item active">nbtools</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/nbtools.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="nbtools">
+<h1>nbtools<a class="headerlink" href="#nbtools" title="Link to this heading"></a></h1>
+<section id="module-nbtools.exec_notebook">
+<span id="linting-and-execution"></span><h2>Linting and execution<a class="headerlink" href="#module-nbtools.exec_notebook" title="Link to this heading"></a></h2>
+<p>Functions for running Jupyter Notebooks programmatically.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="nbtools.exec_notebook.exec_notebook">
+<span class="sig-prename descclassname"><span class="pre">nbtools.exec_notebook.</span></span><span class="sig-name descname"><span class="pre">exec_notebook</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outputs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs_pos</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replace_inputs_pos</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">display_inputs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">display_outputs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">working_dir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'./'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">execute_kwargs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">out_path_db</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">out_path_ipynb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">out_path_html</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove_db</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'always'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">add_timestamp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hide_code_cells</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">display_links</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raise_exception</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_notebook</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_output_queue</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nbtools/exec_notebook.html#exec_notebook"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nbtools.exec_notebook.exec_notebook" title="Link to this definition"></a></dt>
+<dd><p>Execute a Jupyter Notebook programmatically.
+Heavily inspired by <a class="reference external" href="https://github.com/tritemio/nbrun">https://github.com/tritemio/nbrun</a>.</p>
+<p>Intended to be an analog of <code class="docutils literal notranslate"><span class="pre">exec</span></code>, providing a way to inject / extract variables from the execution.
+For a detailed description of how to do that, check the <code class="docutils literal notranslate"><span class="pre">inputs</span></code> and <code class="docutils literal notranslate"><span class="pre">outputs</span></code> parameters.
+The executed notebook is optionally saved to disk as <code class="docutils literal notranslate"><span class="pre">.ipynb</span></code> / <code class="docutils literal notranslate"><span class="pre">.html</span></code> file: we strongly recommend always
+doing so.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">raise_exception</span></code> flag defines the behavior if the execution of the notebook fails due to an exception.</p>
+<dl class="simple">
+<dt>Under the hood, this function does the following:</dt><dd><ul class="simple">
+<li><p>Create an internal database to communicate variables (both <code class="docutils literal notranslate"><span class="pre">inputs</span></code> and <code class="docutils literal notranslate"><span class="pre">outputs</span></code>). Save <code class="docutils literal notranslate"><span class="pre">inputs</span></code> to it.</p></li>
+<li><p>Add a cell for reading <code class="docutils literal notranslate"><span class="pre">inputs</span></code> from the internal database, add a cell for saving <code class="docutils literal notranslate"><span class="pre">outputs</span></code> to it.</p></li>
+<li><p>Execute notebook.</p></li>
+<li><p>Handle exceptions.</p></li>
+<li><p>Read <code class="docutils literal notranslate"><span class="pre">outputs</span></code> from the database.</p></li>
+<li><p>Add a timestamp cell to the notebook, if needed.</p></li>
+<li><p>Save the executed notebook as <code class="docutils literal notranslate"><span class="pre">.ipynb</span></code> and / or <code class="docutils literal notranslate"><span class="pre">.html</span></code>.</p></li>
+<li><p>Return a dictionary with intermediate results, execution info and values of <code class="docutils literal notranslate"><span class="pre">outputs</span></code> variables.</p></li>
+</ul>
+</dd>
+</dl>
+<p>If there are no <code class="docutils literal notranslate"><span class="pre">inputs</span></code> or <code class="docutils literal notranslate"><span class="pre">outputs</span></code>, a database is not created and additional cells are not inserted.
+Note, if either of them is provided, then one of <code class="docutils literal notranslate"><span class="pre">out_path_ipynb</span></code> or <code class="docutils literal notranslate"><span class="pre">out_path_db</span></code> must be explicitly defined.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a>) – Path to the notebook to execute.</p></li>
+<li><p><strong>inputs</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)"><em>dict</em></a><em>, </em><em>optional</em>) – Inputs for execution are essentially equivalent to notebook <code class="docutils literal notranslate"><span class="pre">globals</span></code>.
+Must be a dictionary with variable names and their values; therefore, keys must be valid Python identifiers.
+Under the hood, inputs are saved into a database, loaded in the notebook in a separate cell, that is inserted at
+the <code class="docutils literal notranslate"><span class="pre">inputs_pos</span></code> position. Therefore, values must be serializable.</p></li>
+<li><p><strong>outputs</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a><em> or </em><em>iterable</em><em> of </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a><em>, </em><em>optional</em>) – The list of variable names to return from the notebook.
+Extracted from the notebook in a separate cell, which is inserted at the last position.
+Note, if some of the variables don’t exist, no errors are raised.</p></li>
+<li><p><strong>inputs_pos</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a><em>, </em><em>optional</em>) – Position to insert the cell with <code class="docutils literal notranslate"><span class="pre">inputs</span></code> loading into the notebook.</p></li>
+<li><p><strong>replace_inputs_pos</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a><em>, </em><em>optional</em>) – Whether to replace <code class="docutils literal notranslate"><span class="pre">inputs_pos</span></code> code cell with <code class="docutils literal notranslate"><span class="pre">inputs</span></code> or insert a new one.</p></li>
+<li><p><strong>display_inputs</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to display <code class="docutils literal notranslate"><span class="pre">inputs</span></code> or not.
+Under the hood, inputs are provided using a shelve database. If <code class="docutils literal notranslate"><span class="pre">display_inputs=True</span></code>, variables will be
+inserted in the cell in the following manner: <code class="docutils literal notranslate"><span class="pre">input_name</span> <span class="pre">=</span> <span class="pre">input_value</span></code>, instead of importing code from
+shelve.</p></li>
+<li><p><strong>display_outputs</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to display <code class="docutils literal notranslate"><span class="pre">outputs</span></code> or not.
+Under the hood, outputs are saved using a shelve database. If <code class="docutils literal notranslate"><span class="pre">display_outputs=True</span></code>, variables will be shown
+in the last cell in the following manner: <code class="docutils literal notranslate"><span class="pre">print(input_name)</span></code>, instead of dumping code into the database.</p></li>
+<li><p><strong>working_dir</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a>) – The working directory of starting the kernel.</p></li>
+<li><p><strong>out_path_db</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a><em>, </em><em>optional</em>) – Path to save the internal database files (without file extension).
+If not provided, then it is inferred from <code class="docutils literal notranslate"><span class="pre">out_path_ipynb</span></code>.</p></li>
+<li><p><strong>out_path_ipynb</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a><em>, </em><em>optional</em>) – Path to save the output ipynb file.</p></li>
+<li><p><strong>out_path_html</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a><em>, </em><em>optional</em>) – Path to save the output html file.</p></li>
+<li><p><strong>remove_db</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a><em>, </em><em>optional</em>) – <dl class="simple">
+<dt>Whether to remove the internal database after notebook execution. Possible options are:</dt><dd><ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">'always'</span></code>: remove the database after notebook execution</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">'not_failed_case'</span></code>: remove the database if there wasn’t any execution failure</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">'never'</span></code>: don’t remove the database after notebook execution</p></li>
+</ul>
+</dd>
+</dl>
+<p>Running <a class="reference internal" href="#nbtools.exec_notebook.exec_notebook" title="nbtools.exec_notebook.exec_notebook"><code class="xref py py-func docutils literal notranslate"><span class="pre">exec_notebook()</span></code></a> with the <code class="docutils literal notranslate"><span class="pre">'not_failed_case'</span></code> or <code class="docutils literal notranslate"><span class="pre">'never'</span></code> option helps to reproduce failures
+in the <code class="docutils literal notranslate"><span class="pre">out_path_ipynb</span></code> notebook: it will take the inputs from the saved shelve database.
+Note, that the database exists only if inputs and / or outputs are provided.</p>
+</p></li>
+<li><p><strong>execute_kwargs</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)"><em>dict</em></a><em>, </em><em>optional</em>) – Parameters of <a class="reference external" href="https://nbconvert.readthedocs.io/en/latest/api/preprocessors.html#nbconvert.preprocessors.ExecutePreprocessor" title="(in nbconvert v7.16)"><code class="xref py py-class docutils literal notranslate"><span class="pre">nbconvert.preprocessors.ExecutePreprocessor</span></code></a>.
+For example, you can provide <code class="docutils literal notranslate"><span class="pre">timeout</span></code>, <code class="docutils literal notranslate"><span class="pre">kernel_name</span></code>, <code class="docutils literal notranslate"><span class="pre">resources</span></code> (such as metadata)
+and other <a class="reference external" href="https://nbclient.readthedocs.io/en/latest/reference/nbclient.html#nbclient.client.NotebookClient" title="(in nbclient v0.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">nbclient.client.NotebookClient</span></code></a> arguments.</p></li>
+<li><p><strong>add_timestamp</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to add a cell with execution information at the beginning of the saved notebook.</p></li>
+<li><p><strong>hide_code_cells</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to hide the code cells in the saved notebook.</p></li>
+<li><p><strong>display_links</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to display links to the executed notebook and html at execution.</p></li>
+<li><p><strong>raise_exception</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to re-raise exceptions from the notebook.</p></li>
+<li><p><strong>return_notebook</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to return the notebook object from this function.</p></li>
+<li><p><strong>_output_queue</strong> (<em>None</em>) – Placeholder for the <a class="reference internal" href="#nbtools.exec_notebook.run_in_process" title="nbtools.exec_notebook.run_in_process"><code class="xref py py-func docutils literal notranslate"><span class="pre">run_in_process()</span></code></a> decorator to return this function result.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p><strong>exec_res</strong> – Dictionary with the notebook execution results.
+It provides the following information:</p>
+<blockquote>
+<div><ul>
+<li><dl>
+<dt><code class="docutils literal notranslate"><span class="pre">'failed'</span></code><span class="classifier"><code class="docutils literal notranslate"><span class="pre">bool</span></code></span></dt><dd><p>Whether the notebook execution failed.</p>
+</dd>
+</dl>
+</li>
+<li><dl>
+<dt><code class="docutils literal notranslate"><span class="pre">'outputs'</span></code><span class="classifier"><code class="docutils literal notranslate"><span class="pre">dict</span></code></span></dt><dd><p>Saved notebook local variables. Is not presented in <code class="docutils literal notranslate"><span class="pre">exec_res</span></code> dict, if <code class="docutils literal notranslate"><span class="pre">outputs</span></code>
+argument is <code class="docutils literal notranslate"><span class="pre">None.</span></code></p>
+</dd>
+</dl>
+</li>
+<li><dl>
+<dt><code class="docutils literal notranslate"><span class="pre">'failed</span> <span class="pre">cell</span> <span class="pre">number'</span></code><span class="classifier"><code class="docutils literal notranslate"><span class="pre">int</span></code></span></dt><dd><p>An error cell execution number (if notebook failed).</p>
+</dd>
+</dl>
+</li>
+<li><dl>
+<dt><code class="docutils literal notranslate"><span class="pre">'traceback'</span></code><span class="classifier"><code class="docutils literal notranslate"><span class="pre">str</span></code></span></dt><dd><p>Traceback message from the notebook (if notebook failed).</p>
+</dd>
+</dl>
+</li>
+<li><dl>
+<dt><code class="docutils literal notranslate"><span class="pre">'notebook'</span></code><span class="classifier"><a class="reference external" href="https://nbformat.readthedocs.io/en/latest/api.html#nbformat.NotebookNode" title="(in nbformat v5.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">nbformat.notebooknode.NotebookNode</span></code></a>, optional</span></dt><dd><p>Executed notebook object. Note that this output is provided only if <code class="docutils literal notranslate"><span class="pre">return_notebook</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+</dd>
+</dl>
+</li>
+</ul>
+</div></blockquote>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)">dict</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nbtools.exec_notebook.extract_traceback">
+<span class="sig-prename descclassname"><span class="pre">nbtools.exec_notebook.</span></span><span class="sig-name descname"><span class="pre">extract_traceback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">notebook</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nbtools/exec_notebook.html#extract_traceback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nbtools.exec_notebook.extract_traceback" title="Link to this definition"></a></dt>
+<dd><p>Extracts information about an error from the notebook.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>notebook</strong> (<a class="reference external" href="https://nbformat.readthedocs.io/en/latest/api.html#nbformat.NotebookNode" title="(in nbformat v5.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">nbformat.notebooknode.NotebookNode</span></code></a>) – Executed notebook to find an error traceback.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p>Tuple of three elements:</p>
+<blockquote>
+<div><ul class="simple">
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">bool</span></code></dt><dd><p>Whether the executed notebook has an error traceback.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">int</span></code> or <code class="docutils literal notranslate"><span class="pre">None</span></code></dt><dd><p>Number of a cell with a traceback.
+If <code class="docutils literal notranslate"><span class="pre">None</span></code>, then the notebook doesn’t contain an error traceback.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">str</span></code></dt><dd><p>Error traceback if exists.</p>
+</dd>
+</dl>
+</li>
+</ul>
+</div></blockquote>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.12)">tuple</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nbtools.exec_notebook.run_in_process">
+<span class="sig-prename descclassname"><span class="pre">nbtools.exec_notebook.</span></span><span class="sig-name descname"><span class="pre">run_in_process</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nbtools/exec_notebook.html#run_in_process"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nbtools.exec_notebook.run_in_process" title="Link to this definition"></a></dt>
+<dd><p>Decorator to run the <code class="docutils literal notranslate"><span class="pre">func</span></code> in a separate process for terminating all related processes properly.</p>
+</dd></dl>
+
+<p id="module-nbtools.pylint_notebook">Functions for code quality control of Jupyter Notebooks.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="nbtools.pylint_notebook.pylint_notebook">
+<span class="sig-prename descclassname"><span class="pre">nbtools.pylint_notebook.</span></span><span class="sig-name descname"><span class="pre">pylint_notebook</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options=()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">disable=()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enable=()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">printer=&lt;built-in</span> <span class="pre">function</span> <span class="pre">print&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove_files=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_info=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**pylint_params</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nbtools/pylint_notebook.html#pylint_notebook"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nbtools.pylint_notebook.pylint_notebook" title="Link to this definition"></a></dt>
+<dd><p>Execute <code class="docutils literal notranslate"><span class="pre">pylint</span></code> for a provided Jupyter Notebook.</p>
+<dl class="simple">
+<dt>Under the hood, roughly does the following:</dt><dd><ul class="simple">
+<li><p>Creates a <code class="docutils literal notranslate"><span class="pre">.pylintrc</span></code> file next to the <code class="docutils literal notranslate"><span class="pre">path</span></code>, if needed.</p></li>
+<li><p>Converts the notebook to <cite>.py</cite> file next to the <code class="docutils literal notranslate"><span class="pre">path</span></code>.</p></li>
+<li><p>Runs <code class="docutils literal notranslate"><span class="pre">pylint</span></code> with additional options.</p></li>
+<li><p>Create a report and display it, if needed.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a><em>, </em><em>optional</em>) – Path to the Jupyter notebook. If not provided, the current notebook is used.</p></li>
+<li><p><strong>options</strong> (<em>sequence</em>) – Additional options for <code class="docutils literal notranslate"><span class="pre">pylint</span></code> execution.</p></li>
+<li><p><strong>config</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a><em>, </em><em>None</em>) – Path to a pylint config in the <code class="docutils literal notranslate"><span class="pre">.pylintrc</span></code> format.
+Note, if config is not None, then <cite>disable</cite> and <cite>enable</cite> are not used.</p></li>
+<li><p><strong>printer</strong> (<em>callable</em><em> or </em><em>None</em>) – Function to display the report.</p></li>
+<li><p><strong>remove_files</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><em>bool</em></a>) – Whether to remove <code class="docutils literal notranslate"><span class="pre">.pylintrc</span></code> and <code class="docutils literal notranslate"><span class="pre">.py</span></code> files after the execution.</p></li>
+<li><p><strong>return_info</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><em>bool</em></a>) – Whether to return a dictionary with intermediate results.
+It contains the notebook code string, as well as <code class="docutils literal notranslate"><span class="pre">pylint</span></code> stdout and stderr.</p></li>
+<li><p><strong>disable</strong> (<em>sequence</em>) – Which checks to disable. Each element should be either a code or a name of the check.</p></li>
+<li><p><strong>enable</strong> (<em>sequence</em>) – Which checks to enable. Each element should be either a code or a name of the check.
+Has priority over <code class="docutils literal notranslate"><span class="pre">disable</span></code>.</p></li>
+<li><p><strong>max_line_length</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a>) – Allowed line length.</p></li>
+<li><p><strong>pylint_params</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.12)"><em>dict</em></a>) – Additional parameter of linting. Each is converted to a separate valid entry in the <code class="docutils literal notranslate"><span class="pre">.pylintrc</span></code> file.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-nbtools.core">
+<span id="gpu-utils"></span><h2>GPU utils<a class="headerlink" href="#module-nbtools.core" title="Link to this heading"></a></h2>
+<p>Core utility functions to work with Jupyter Notebooks.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="nbtools.core.free_gpus">
+<span class="sig-prename descclassname"><span class="pre">nbtools.core.</span></span><span class="sig-name descname"><span class="pre">free_gpus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">devices</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nbtools/core.html#free_gpus"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nbtools.core.free_gpus" title="Link to this definition"></a></dt>
+<dd><p>Terminate all processes on gpu devices.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>devices</strong> (<em>iterable</em><em> of </em><em>ints</em>) – Device indices to terminate processes. If <code class="docutils literal notranslate"><span class="pre">None</span></code>, than free all available gpus.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nbtools.core.get_available_gpus">
+<span class="sig-prename descclassname"><span class="pre">nbtools.core.</span></span><span class="sig-name descname"><span class="pre">get_available_gpus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_free_memory</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.9</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_processes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raise_error</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nbtools/core.html#get_available_gpus"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nbtools.core.get_available_gpus" title="Link to this definition"></a></dt>
+<dd><p>Select <code class="docutils literal notranslate"><span class="pre">n</span></code> gpus from available and free devices.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a>) – <ul>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">'max'</span></code>, then use maximum number of available devices.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">int</span></code>, then number of devices to select.</p></li>
+</ul>
+</p></li>
+<li><p><strong>min_free_memory</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.12)"><em>float</em></a>) – Minimum percentage of free memory on a device to consider it free.</p></li>
+<li><p><strong>max_processes</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a>) – Maximum amount of computed processes on a device to consider it free.</p></li>
+<li><p><strong>verbose</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><em>bool</em></a>) – Whether to show individual device information.</p></li>
+<li><p><strong>raise_error</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><em>bool</em></a>) – Whether to raise an exception if not enough devices are available.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>available_devices</strong> – Indices of available GPUs.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.12)">list</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nbtools.core.get_gpu_free_memory">
+<span class="sig-prename descclassname"><span class="pre">nbtools.core.</span></span><span class="sig-name descname"><span class="pre">get_gpu_free_memory</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">index</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nbtools/core.html#get_gpu_free_memory"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nbtools.core.get_gpu_free_memory" title="Link to this definition"></a></dt>
+<dd><p>Get free memory of a device.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nbtools.core.set_gpus">
+<span class="sig-prename descclassname"><span class="pre">nbtools.core.</span></span><span class="sig-name descname"><span class="pre">set_gpus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_free_memory</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.9</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_processes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raise_error</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nbtools/core.html#set_gpus"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nbtools.core.set_gpus" title="Link to this definition"></a></dt>
+<dd><p>Set the <code class="docutils literal notranslate"><span class="pre">CUDA_VISIBLE_DEVICES</span></code> variable to <code class="docutils literal notranslate"><span class="pre">n</span></code> available devices.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><em>str</em></a>) – <ul>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">'max'</span></code>, then use maximum number of available devices.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">int</span></code>, then number of devices to select.</p></li>
+</ul>
+</p></li>
+<li><p><strong>min_free_memory</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.12)"><em>float</em></a>) – Minimum percentage of free memory on a device to consider it free.</p></li>
+<li><p><strong>max_processes</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a>) – Maximum amount of computed processes on a device to consider it free.</p></li>
+<li><p><strong>verbose</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><em>bool</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.12)"><em>int</em></a>) – <p>Whether to show individual device information.</p>
+<blockquote>
+<div><ul>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">0</span></code> or <code class="docutils literal notranslate"><span class="pre">False</span></code>, then no information is displayed.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">1</span></code> or <code class="docutils literal notranslate"><span class="pre">True</span></code>, then display the value assigned to <code class="docutils literal notranslate"><span class="pre">CUDA_VISIBLE_DEVICES</span></code> variable.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">2</span></code>, then display memory and process information for each device.</p></li>
+</ul>
+</div></blockquote>
+</p></li>
+<li><p><strong>raise_error</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><em>bool</em></a>) – Whether to raise an exception if not enough devices are available.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>devices</strong> – Indices of selected and reserved GPUs.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.12)">list</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="monitoring-tools">
+<h2>Monitoring tools<a class="headerlink" href="#monitoring-tools" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nbtools.nbstat.resource_inspector.ResourceInspector">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nbtools.nbstat.resource_inspector.</span></span><span class="sig-name descname"><span class="pre">ResourceInspector</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">formatter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nbtools/nbstat/resource_inspector.html#ResourceInspector"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nbtools.nbstat.resource_inspector.ResourceInspector" title="Link to this definition"></a></dt>
+<dd><p>A class to controll the process of gathering information about system resources into ResourceTables,
+merging them into views, and formatting into nice colored strings.</p>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="modules.html" class="btn btn-neutral float-left" title="API reference" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Analysis Center.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

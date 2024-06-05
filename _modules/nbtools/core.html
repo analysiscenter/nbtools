@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>nbtools.core &mdash; nbtools  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html">
+            
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/nbtools.html">Getting Started</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/modules.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">nbtools</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">nbtools.core</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for nbtools.core</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot; Core utility functions to work with Jupyter Notebooks. &quot;&quot;&quot;</span>
+<span class="c1">#pylint: disable=import-outside-toplevel</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+
+
+
+<span class="k">class</span> <span class="nc">StringWithDisabledRepr</span><span class="p">(</span><span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; String with disabled repr. Used to avoid cluttering repr from function outputs. &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Shorten the repr of a string. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s1">&#39;&lt;StringWithDisabledRepr at </span><span class="si">{</span><span class="nb">hex</span><span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span><span class="si">}</span><span class="s1">. Use `str`/`print` explicitly!&gt;&#39;</span>
+
+
+
+<span class="k">def</span> <span class="nf">in_notebook</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return True if in Jupyter notebook and False otherwise. &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">shell</span> <span class="o">=</span> <span class="n">get_ipython</span><span class="p">()</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span>
+        <span class="k">if</span> <span class="n">shell</span> <span class="o">==</span> <span class="s1">&#39;ZMQInteractiveShell&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">if</span> <span class="n">shell</span> <span class="o">==</span> <span class="s1">&#39;TerminalInteractiveShell&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">except</span> <span class="ne">NameError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+<span class="k">def</span> <span class="nf">get_notebook_path</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return the full absolute path of the current Jupyter notebook,</span>
+<span class="sd">    for example, `/path/path/path/My_notebook_title.ipynb`.</span>
+
+<span class="sd">    If run outside Jupyter notebook, returns None.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#pylint: disable=missing-timeout</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">in_notebook</span><span class="p">():</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="kn">import</span> <span class="nn">requests</span>
+    <span class="kn">import</span> <span class="nn">ipykernel</span>
+
+    <span class="c1"># Id of the current running kernel: a string uid</span>
+    <span class="n">kernel_id</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="s1">&#39;kernel-(.*).json&#39;</span><span class="p">,</span> <span class="n">ipykernel</span><span class="o">.</span><span class="n">connect</span><span class="o">.</span><span class="n">get_connection_file</span><span class="p">())</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># Get running servers for both JupyterLab v2.# and v3.#</span>
+    <span class="kn">from</span> <span class="nn">notebook.notebookapp</span> <span class="kn">import</span> <span class="n">list_running_servers</span> <span class="k">as</span> <span class="n">list_running_servers_v2</span>
+    <span class="kn">from</span> <span class="nn">jupyter_server.serverapp</span> <span class="kn">import</span> <span class="n">list_running_servers</span> <span class="k">as</span> <span class="n">list_running_servers_v3</span>
+    <span class="n">servers</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">list_running_servers_v2</span><span class="p">())</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">list_running_servers_v3</span><span class="p">())</span>
+
+    <span class="k">for</span> <span class="n">server</span> <span class="ow">in</span> <span class="n">servers</span><span class="p">:</span>
+        <span class="n">root_dir</span> <span class="o">=</span> <span class="n">server</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;root_dir&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">server</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;notebook_dir&#39;</span><span class="p">)</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">requests</span><span class="o">.</span><span class="n">compat</span><span class="o">.</span><span class="n">urljoin</span><span class="p">(</span><span class="n">server</span><span class="p">[</span><span class="s1">&#39;url&#39;</span><span class="p">],</span> <span class="s1">&#39;api/sessions&#39;</span><span class="p">),</span>
+                                <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;token&#39;</span><span class="p">:</span> <span class="n">server</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;token&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)})</span>
+
+        <span class="k">for</span> <span class="n">params</span> <span class="ow">in</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">text</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">params</span><span class="p">[</span><span class="s1">&#39;kernel&#39;</span><span class="p">][</span><span class="s1">&#39;id&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">kernel_id</span><span class="p">:</span>
+                <span class="n">relative_path</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="s1">&#39;notebook&#39;</span><span class="p">][</span><span class="s1">&#39;path&#39;</span><span class="p">]</span>
+                <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">root_dir</span><span class="p">,</span> <span class="n">relative_path</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Unable to find kernel `</span><span class="si">{</span><span class="n">kernel_id</span><span class="si">}</span><span class="s1">` in </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">servers</span><span class="p">)</span><span class="si">}</span><span class="s1"> servers!&#39;</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">get_notebook_name</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Return the title of the current Jupyter notebook without base directory and extension,</span>
+<span class="sd">    for example, `My_notebook_title`.</span>
+
+<span class="sd">    If run outside Jupyter notebook, returns None.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">in_notebook</span><span class="p">():</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">get_notebook_path</span><span class="p">())[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+
+<span class="k">def</span> <span class="nf">notebook_to_script</span><span class="p">(</span><span class="n">path_script</span><span class="p">,</span> <span class="n">path_notebook</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ignore_markdown</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">return_info</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Convert a notebook to a script. &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">nbformat</span> <span class="c1">#pylint: disable=import-outside-toplevel</span>
+    <span class="n">path_notebook</span> <span class="o">=</span> <span class="n">path_notebook</span> <span class="ow">or</span> <span class="n">get_notebook_path</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">path_notebook</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Provide path to Jupyter Notebook or run `notebook_to_script` inside of it!&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Read notebook as list of cells</span>
+    <span class="n">notebook</span> <span class="o">=</span> <span class="n">nbformat</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">path_notebook</span><span class="p">,</span> <span class="n">as_version</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+
+    <span class="n">code_lines</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">cell_number</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">cell_line_numbers</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="n">notebook</span><span class="p">[</span><span class="s1">&#39;cells&#39;</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">ignore_markdown</span> <span class="ow">and</span> <span class="n">cell</span><span class="p">[</span><span class="s1">&#39;cell_type&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;code&#39;</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="n">cell_lines</span> <span class="o">=</span> <span class="n">cell</span><span class="p">[</span><span class="s1">&#39;source&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">cell</span><span class="p">[</span><span class="s1">&#39;cell_type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;code&#39;</span><span class="p">:</span>
+            <span class="n">cell_lines</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">### [</span><span class="si">{</span><span class="n">cell_number</span><span class="si">}</span><span class="s1">] cell&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Comment cell/line magics</span>
+        <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cell_lines</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;%&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;!&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">cell</span><span class="p">[</span><span class="s1">&#39;cell_type&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;code&#39;</span><span class="p">:</span>
+                <span class="n">cell_lines</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;### &#39;</span> <span class="o">+</span> <span class="n">line</span>
+
+        <span class="n">code_line_number</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">code_lines</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="n">cell_line_numbers</span><span class="p">[</span><span class="n">cell_number</span><span class="p">]</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="n">code_line_number</span><span class="p">,</span> <span class="n">code_line_number</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">cell_lines</span><span class="p">))</span>
+
+        <span class="n">code_lines</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">cell_lines</span><span class="p">])</span>
+        <span class="n">code_lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">cell</span><span class="p">[</span><span class="s1">&#39;cell_type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;code&#39;</span><span class="p">:</span>
+            <span class="n">cell_number</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="n">code</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">code_lines</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path_script</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+        <span class="n">file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">return_info</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="n">StringWithDisabledRepr</span><span class="p">(</span><span class="n">code</span><span class="p">),</span>
+                <span class="s1">&#39;cell_line_numbers&#39;</span><span class="p">:</span> <span class="n">cell_line_numbers</span><span class="p">}</span>
+    <span class="k">return</span> <span class="kc">None</span>
+
+
+
+<div class="viewcode-block" id="get_available_gpus">
+<a class="viewcode-back" href="../../api/nbtools.html#nbtools.core.get_available_gpus">[docs]</a>
+<span class="k">def</span> <span class="nf">get_available_gpus</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">min_free_memory</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">max_processes</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">raise_error</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Select ``n`` gpus from available and free devices.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    n : int, str</span>
+
+<span class="sd">        * If ``&#39;max&#39;``, then use maximum number of available devices.</span>
+<span class="sd">        * If ``int``, then number of devices to select.</span>
+
+<span class="sd">    min_free_memory : float</span>
+<span class="sd">        Minimum percentage of free memory on a device to consider it free.</span>
+<span class="sd">    max_processes : int</span>
+<span class="sd">        Maximum amount of computed processes on a device to consider it free.</span>
+<span class="sd">    verbose : bool</span>
+<span class="sd">        Whether to show individual device information.</span>
+<span class="sd">    raise_error : bool</span>
+<span class="sd">        Whether to raise an exception if not enough devices are available.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    available_devices : list</span>
+<span class="sd">        Indices of available GPUs.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span> <span class="nn">nvidia_smi</span>
+    <span class="k">except</span> <span class="ne">ImportError</span> <span class="k">as</span> <span class="n">exception</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span><span class="s1">&#39;Install Python interface for nvidia_smi&#39;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">exception</span>
+
+    <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlInit</span><span class="p">()</span>
+    <span class="n">n_devices</span> <span class="o">=</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetCount</span><span class="p">()</span>
+
+    <span class="n">available_devices</span><span class="p">,</span> <span class="n">memory_usage</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_devices</span><span class="p">):</span>
+        <span class="n">handle</span> <span class="o">=</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetHandleByIndex</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+        <span class="n">info</span> <span class="o">=</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetMemoryInfo</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>
+
+        <span class="n">fraction_free</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">free</span> <span class="o">/</span> <span class="n">info</span><span class="o">.</span><span class="n">total</span>
+        <span class="n">num_processes</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetComputeRunningProcesses</span><span class="p">(</span><span class="n">handle</span><span class="p">))</span>
+
+        <span class="n">consider_available</span> <span class="o">=</span> <span class="p">(</span><span class="n">fraction_free</span> <span class="o">&gt;</span> <span class="n">min_free_memory</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">num_processes</span> <span class="o">&lt;=</span> <span class="n">max_processes</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">consider_available</span><span class="p">:</span>
+            <span class="n">available_devices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+            <span class="n">memory_usage</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fraction_free</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Device </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s1"> | Free memory: </span><span class="si">{</span><span class="n">fraction_free</span><span class="si">:</span><span class="s1">4.2f</span><span class="si">}</span><span class="s1"> | &#39;</span>
+                  <span class="sa">f</span><span class="s1">&#39;Number of running processes: </span><span class="si">{</span><span class="n">num_processes</span><span class="si">:</span><span class="s1">&gt;2</span><span class="si">}</span><span class="s1"> | Free: </span><span class="si">{</span><span class="n">consider_available</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlShutdown</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">n</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;max&#39;</span><span class="p">):</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">available_devices</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">available_devices</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">n</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;Not enough free devices: requested </span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s1">, found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">available_devices</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span>
+        <span class="k">if</span> <span class="n">raise_error</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="ne">RuntimeWarning</span><span class="p">)</span>
+
+    <span class="c1"># Argsort of `memory_usage` in a descending order</span>
+    <span class="n">indices</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">available_devices</span><span class="p">)),</span> <span class="n">key</span><span class="o">=</span><span class="n">memory_usage</span><span class="o">.</span><span class="fm">__getitem__</span><span class="p">,</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">available_devices</span> <span class="o">=</span> <span class="p">[</span><span class="n">available_devices</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">]</span>
+    <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">available_devices</span><span class="p">[:</span><span class="n">n</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="get_gpu_free_memory">
+<a class="viewcode-back" href="../../api/nbtools.html#nbtools.core.get_gpu_free_memory">[docs]</a>
+<span class="k">def</span> <span class="nf">get_gpu_free_memory</span><span class="p">(</span><span class="n">index</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Get free memory of a device. &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span> <span class="nn">nvidia_smi</span>
+    <span class="k">except</span> <span class="ne">ImportError</span> <span class="k">as</span> <span class="n">exception</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span><span class="s1">&#39;Install Python interface for nvidia_smi&#39;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">exception</span>
+
+    <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlInit</span><span class="p">()</span>
+    <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetCount</span><span class="p">()</span>
+    <span class="n">handle</span> <span class="o">=</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetHandleByIndex</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
+    <span class="n">info</span> <span class="o">=</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetMemoryInfo</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>
+    <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlShutdown</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">info</span><span class="o">.</span><span class="n">free</span> <span class="o">/</span> <span class="n">info</span><span class="o">.</span><span class="n">total</span></div>
+
+
+<div class="viewcode-block" id="set_gpus">
+<a class="viewcode-back" href="../../api/nbtools.html#nbtools.core.set_gpus">[docs]</a>
+<span class="k">def</span> <span class="nf">set_gpus</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">min_free_memory</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">max_processes</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">raise_error</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Set the ``CUDA_VISIBLE_DEVICES`` variable to ``n`` available devices.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    n : int, str</span>
+
+<span class="sd">        * If ``&#39;max&#39;``, then use maximum number of available devices.</span>
+<span class="sd">        * If ``int``, then number of devices to select.</span>
+
+<span class="sd">    min_free_memory : float</span>
+<span class="sd">        Minimum percentage of free memory on a device to consider it free.</span>
+<span class="sd">    max_processes : int</span>
+<span class="sd">        Maximum amount of computed processes on a device to consider it free.</span>
+<span class="sd">    verbose : bool or int</span>
+<span class="sd">        Whether to show individual device information.</span>
+
+<span class="sd">            * If ``0`` or ``False``, then no information is displayed.</span>
+<span class="sd">            * If ``1`` or ``True``, then display the value assigned to ``CUDA_VISIBLE_DEVICES`` variable.</span>
+<span class="sd">            * If ``2``, then display memory and process information for each device.</span>
+
+<span class="sd">    raise_error : bool</span>
+<span class="sd">        Whether to raise an exception if not enough devices are available.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    devices : list</span>
+<span class="sd">        Indices of selected and reserved GPUs.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#pylint: disable=consider-iterating-dictionary</span>
+    <span class="k">if</span> <span class="s1">&#39;CUDA_VISIBLE_DEVICES&#39;</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+        <span class="n">str_devices</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;CUDA_VISIBLE_DEVICES&quot;</span><span class="p">]</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;`CUDA_VISIBLE_DEVICES` is already set to &quot;</span><span class="si">{</span><span class="n">str_devices</span><span class="si">}</span><span class="s1">&quot;!&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">str_devices</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)]</span>
+
+    <span class="n">devices</span> <span class="o">=</span> <span class="n">get_available_gpus</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="n">n</span><span class="p">,</span> <span class="n">min_free_memory</span><span class="o">=</span><span class="n">min_free_memory</span><span class="p">,</span> <span class="n">max_processes</span><span class="o">=</span><span class="n">max_processes</span><span class="p">,</span>
+                                 <span class="n">verbose</span><span class="o">=</span><span class="p">(</span><span class="n">verbose</span><span class="o">==</span><span class="mi">2</span><span class="p">),</span> <span class="n">raise_error</span><span class="o">=</span><span class="n">raise_error</span><span class="p">)</span>
+    <span class="n">str_devices</span> <span class="o">=</span> <span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">devices</span><span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;CUDA_VISIBLE_DEVICES&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">str_devices</span>
+
+    <span class="n">newline</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">verbose</span><span class="o">==</span><span class="mi">2</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">newline</span><span class="si">}</span><span class="s1">`CUDA_VISIBLE_DEVICES` set to &quot;</span><span class="si">{</span><span class="n">str_devices</span><span class="si">}</span><span class="s1">&quot;&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">devices</span></div>
+
+
+<div class="viewcode-block" id="free_gpus">
+<a class="viewcode-back" href="../../api/nbtools.html#nbtools.core.free_gpus">[docs]</a>
+<span class="k">def</span> <span class="nf">free_gpus</span><span class="p">(</span><span class="n">devices</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Terminate all processes on gpu devices.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    devices : iterable of ints</span>
+<span class="sd">        Device indices to terminate processes. If ``None``, than free all available gpus.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">nvidia_smi</span>
+    <span class="kn">import</span> <span class="nn">psutil</span>
+
+    <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlInit</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">devices</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s1">&#39;CUDA_VISIBLE_DEVICES&#39;</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="n">devices</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;CUDA_VISIBLE_DEVICES&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">devices</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetCount</span><span class="p">())</span>
+
+    <span class="k">for</span> <span class="n">device_index</span> <span class="ow">in</span> <span class="n">devices</span><span class="p">:</span>
+        <span class="n">handle</span> <span class="o">=</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetHandleByIndex</span><span class="p">(</span><span class="n">device_index</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">proc</span> <span class="ow">in</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetComputeRunningProcesses</span><span class="p">(</span><span class="n">handle</span><span class="p">):</span>
+            <span class="n">psutil</span><span class="o">.</span><span class="n">Process</span><span class="p">(</span><span class="n">proc</span><span class="o">.</span><span class="n">pid</span><span class="p">)</span><span class="o">.</span><span class="n">terminate</span><span class="p">()</span>
+
+    <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlShutdown</span><span class="p">()</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Analysis Center.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>nbtools.nbstat.resource_inspector &mdash; nbtools  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html">
+            
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/nbtools.html">Getting Started</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/modules.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">nbtools</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">nbtools.nbstat.resource_inspector</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for nbtools.nbstat.resource_inspector</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot; Controlling class for fetching tables with system information,</span>
+<span class="sd">merging them into a view and displaying in a stream.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<span class="kn">import</span> <span class="nn">psutil</span>
+<span class="kn">import</span> <span class="nn">requests</span>
+<span class="kn">from</span> <span class="nn">blessed</span> <span class="kn">import</span> <span class="n">Terminal</span>
+
+<span class="kn">import</span> <span class="nn">nvidia_smi</span>
+
+<span class="kn">from</span> <span class="nn">.resource</span> <span class="kn">import</span> <span class="n">Resource</span>
+<span class="kn">from</span> <span class="nn">.resource_table</span> <span class="kn">import</span> <span class="n">ResourceTable</span>
+<span class="kn">from</span> <span class="nn">.utils</span> <span class="kn">import</span> <span class="n">format_memory</span><span class="p">,</span> <span class="n">pid_to_name</span><span class="p">,</span> <span class="n">pid_to_ngid</span><span class="p">,</span> <span class="n">FiniteList</span><span class="p">,</span> <span class="n">true_len</span><span class="p">,</span> <span class="n">true_rjust</span><span class="p">,</span> <span class="n">true_center</span>
+<span class="kn">from</span> <span class="nn">..exec_notebook</span> <span class="kn">import</span> <span class="n">get_exec_notebook_name</span>
+
+
+
+<span class="n">KERNEL_ID_SEARCHER</span>   <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s1">&#39;kernel-(.*).json&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">search</span>
+<span class="n">VSCODE_KEY_SEARCHER</span>  <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s1">&#39;key=b&quot;(.*)&quot;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">search</span>
+<span class="n">SCRIPT_NAME_SEARCHER</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s1">&#39;python.* (.*).py&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">search</span>
+<span class="n">RUN_NOTEBOOK_PATH_SEARCHER</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s1">&#39;/tmp/.*.json.*--HistoryManager.hist_file=:memory:.*&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">search</span>
+
+
+<div class="viewcode-block" id="ResourceInspector">
+<a class="viewcode-back" href="../../../api/nbtools.html#nbtools.nbstat.resource_inspector.ResourceInspector">[docs]</a>
+<span class="k">class</span> <span class="nc">ResourceInspector</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; A class to controll the process of gathering information about system resources into ResourceTables,</span>
+<span class="sd">    merging them into views, and formatting into nice colored strings.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># TODO: correct working with VSCode Jupyter Notebooks</span>
+    <span class="c1"># TODO: make sure that everything works without sudo</span>
+    <span class="c1"># TODO: add more fallbacks for unavailable resources</span>
+    <span class="c1"># TODO: can add explicit __delete__ to call nvidia_smi.nvmlShutdown(), if we ever have problems with that</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">formatter</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">formatter</span> <span class="o">=</span> <span class="n">formatter</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_device_handles</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_device_utils</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">warnings</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_v_position</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">device_handles</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Cached handles of NVIDIA devices. &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device_handles</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlInit</span><span class="p">()</span>
+            <span class="n">n_devices</span> <span class="o">=</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetCount</span><span class="p">()</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_device_handles</span> <span class="o">=</span> <span class="p">{</span><span class="n">device_id</span> <span class="p">:</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetHandleByIndex</span><span class="p">(</span><span class="n">device_id</span><span class="p">)</span>
+                                    <span class="k">for</span> <span class="n">device_id</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_devices</span><span class="p">)}</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device_handles</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">device_utils</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Values of device utilization over time. &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device_utils</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_device_utils</span> <span class="o">=</span> <span class="p">{</span><span class="n">device_id</span> <span class="p">:</span> <span class="n">FiniteList</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+                                  <span class="k">for</span> <span class="n">device_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">device_handles</span><span class="p">}</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device_utils</span>
+
+
+    <span class="c1"># Collect system resources into ResourceTables</span>
+    <span class="k">def</span> <span class="nf">get_device_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">formatter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">20</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Collect data about current device usage into two tables:</span>
+<span class="sd">        one is indexed by device, the second is indexed by process on a device.</span>
+
+<span class="sd">        Each value is collected only if requested by the current formatter.</span>
+<span class="sd">        Device-wide values (like temperature and utilization) are reported for each process.</span>
+
+<span class="sd">        As the slowest operation is getting device handles, we cache it inside the instance attributes.</span>
+<span class="sd">        Note that this does nothing for a single query to this class.</span>
+
+<span class="sd">        PIDs, reported by nvidia-smi, are from the host namespace and may (most probably) not</span>
+<span class="sd">        exist in the container namespace. Currently, we don&#39;t have a reliable and not overly hacky way of matching it to</span>
+<span class="sd">        a PID inside the container: we circumwent this problem in the `process_table`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">formatter</span> <span class="o">=</span> <span class="n">formatter</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">formatter</span>
+        <span class="n">device_table</span><span class="p">,</span> <span class="n">device_process_table</span> <span class="o">=</span> <span class="n">ResourceTable</span><span class="p">(),</span> <span class="n">ResourceTable</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">device_id</span><span class="p">,</span> <span class="n">handle</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">device_handles</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">device_name</span> <span class="o">=</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetName</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>
+            <span class="n">device_name</span> <span class="o">=</span> <span class="n">device_name</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">device_name</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span> <span class="k">else</span> <span class="n">device_name</span>
+            <span class="n">common_info</span> <span class="o">=</span> <span class="p">{</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_ID</span> <span class="p">:</span> <span class="n">device_id</span><span class="p">,</span>
+                           <span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_NAME</span> <span class="p">:</span> <span class="n">device_name</span><span class="p">}</span>
+
+            <span class="c1"># Inseparable device information like memory, temperature, power, etc. Request it only if needed</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">formatter</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_UTIL</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="ow">or</span>
+                <span class="n">formatter</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_UTIL_MA</span><span class="p">,</span> <span class="kc">False</span><span class="p">)):</span>
+                <span class="n">utilization</span> <span class="o">=</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetUtilizationRates</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>
+                <span class="n">common_info</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_UTIL</span><span class="p">]</span> <span class="o">=</span> <span class="n">utilization</span><span class="o">.</span><span class="n">gpu</span>
+                <span class="n">common_info</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_MEMORY_UTIL</span><span class="p">]</span> <span class="o">=</span> <span class="n">utilization</span><span class="o">.</span><span class="n">memory</span>
+
+                <span class="c1"># Store values over requests to compute moving average of device utilization</span>
+                <span class="n">lst</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device_utils</span><span class="p">[</span><span class="n">device_id</span><span class="p">]</span>
+                <span class="n">lst</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">utilization</span><span class="o">.</span><span class="n">gpu</span><span class="p">)</span>
+                <span class="n">common_info</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_UTIL_MA</span><span class="p">]</span> <span class="o">=</span> <span class="n">lst</span><span class="o">.</span><span class="n">get_average</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="n">window</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">formatter</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_TEMP</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+                <span class="n">temperature</span> <span class="o">=</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetTemperature</span><span class="p">(</span><span class="n">handle</span><span class="p">,</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">NVML_TEMPERATURE_GPU</span><span class="p">)</span>
+                <span class="n">common_info</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_TEMP</span><span class="p">]</span> <span class="o">=</span> <span class="n">temperature</span>
+
+            <span class="k">if</span> <span class="n">formatter</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_FAN</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+                <span class="n">fan_speed</span> <span class="o">=</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetFanSpeed</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>
+                <span class="n">common_info</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_FAN</span><span class="p">]</span> <span class="o">=</span> <span class="n">fan_speed</span>
+
+            <span class="k">if</span> <span class="n">formatter</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_POWER_USED</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+                <span class="n">power_used</span> <span class="o">=</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetPowerUsage</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>
+                <span class="n">power_total</span> <span class="o">=</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetEnforcedPowerLimit</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>
+
+                <span class="n">common_info</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_POWER_USED</span><span class="p">]</span> <span class="o">=</span> <span class="n">power_used</span>
+                <span class="n">common_info</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_POWER_TOTAL</span><span class="p">]</span> <span class="o">=</span> <span class="n">power_total</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="n">formatter</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_MEMORY_USED</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="ow">or</span>
+                <span class="n">formatter</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_PROCESS_MEMORY_USED</span><span class="p">,</span> <span class="kc">False</span><span class="p">)):</span>
+                <span class="n">memory</span> <span class="o">=</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetMemoryInfo</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>
+                <span class="n">common_info</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_MEMORY_USED</span><span class="p">]</span> <span class="o">=</span> <span class="n">memory</span><span class="o">.</span><span class="n">used</span>
+                <span class="n">common_info</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_MEMORY_TOTAL</span><span class="p">]</span> <span class="o">=</span> <span class="n">memory</span><span class="o">.</span><span class="n">total</span>
+
+            <span class="c1"># Collect individual processes info, if needed. Save it to both tables: in one as list, in other separately</span>
+            <span class="n">device_info</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">common_info</span><span class="p">}</span>
+            <span class="n">processes</span> <span class="o">=</span> <span class="n">nvidia_smi</span><span class="o">.</span><span class="n">nvmlDeviceGetComputeRunningProcesses</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>
+            <span class="n">device_info</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_PROCESS_N</span> <span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                                <span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_PROCESS_PID</span> <span class="p">:</span> <span class="p">[],</span>
+                                <span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_PROCESS_MEMORY_USED</span> <span class="p">:</span> <span class="p">[]})</span>
+
+            <span class="k">if</span> <span class="n">processes</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">process</span> <span class="ow">in</span> <span class="n">processes</span><span class="p">:</span>
+                    <span class="n">pid</span><span class="p">,</span> <span class="n">process_memory</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">pid</span><span class="p">,</span> <span class="n">process</span><span class="o">.</span><span class="n">usedGpuMemory</span>
+
+                    <span class="c1"># Update the aggregate device info table</span>
+                    <span class="n">device_info</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_PROCESS_N</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="n">device_info</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_PROCESS_PID</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pid</span><span class="p">)</span>
+                    <span class="n">device_info</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_PROCESS_MEMORY_USED</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">process_memory</span><span class="p">)</span>
+
+                    <span class="c1"># Update the table with individual processes</span>
+                    <span class="n">device_process_info</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">common_info</span><span class="p">}</span>
+                    <span class="n">device_process_info</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_PROCESS_PID</span><span class="p">]</span> <span class="o">=</span> <span class="n">pid</span>
+                    <span class="n">device_process_info</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_PROCESS_MEMORY_USED</span><span class="p">]</span> <span class="o">=</span> <span class="n">process_memory</span>
+                    <span class="n">device_process_table</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">device_process_info</span><span class="p">)</span>
+
+            <span class="n">device_table</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">device_info</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+            <span class="s1">&#39;device_table&#39;</span><span class="p">:</span> <span class="n">device_table</span><span class="p">,</span>
+            <span class="s1">&#39;device_process_table&#39;</span><span class="p">:</span> <span class="n">device_process_table</span><span class="p">,</span>
+        <span class="p">})</span>
+        <span class="k">return</span> <span class="n">device_table</span><span class="p">,</span> <span class="n">device_process_table</span>
+
+    <span class="k">def</span> <span class="nf">get_notebook_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">formatter</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Collect information about all running Jupyter Notebooks inside all of the Jupyter Servers.</span>
+<span class="sd">        Works with both v2 and v3 APIs.</span>
+
+<span class="sd">        The most valuable information from this table is the mapping from `kernel_id` to `path` and `name`: all of</span>
+<span class="sd">        other properties of a process can be retrieved by looking at the process (see `get_process_table`).</span>
+
+<span class="sd">        TODO: once VSCode has stable standard and doc for ipykernel launches, add its parsing here.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1">#pylint: disable=import-outside-toplevel, missing-timeout</span>
+        <span class="n">servers</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">from</span> <span class="nn">notebook.notebookapp</span> <span class="kn">import</span> <span class="n">list_running_servers</span> <span class="k">as</span> <span class="n">list_running_servers_v2</span>
+            <span class="n">servers</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">list_running_servers_v2</span><span class="p">()))</span>
+        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+            <span class="k">pass</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">from</span> <span class="nn">jupyter_server.serverapp</span> <span class="kn">import</span> <span class="n">list_running_servers</span> <span class="k">as</span> <span class="n">list_running_servers_v3</span>
+            <span class="n">servers</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">list_running_servers_v3</span><span class="p">()))</span>
+        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+        <span class="n">_</span> <span class="o">=</span> <span class="n">formatter</span> <span class="c1"># currently, not used</span>
+
+        <span class="c1"># Information about all running kernels for all running servers</span>
+        <span class="n">notebook_table</span> <span class="o">=</span> <span class="n">ResourceTable</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">server</span> <span class="ow">in</span> <span class="n">servers</span><span class="p">:</span>
+            <span class="n">root_dir</span> <span class="o">=</span> <span class="n">server</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;root_dir&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">server</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;notebook_dir&#39;</span><span class="p">)</span> <span class="c1"># for v2 and v3</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">requests</span><span class="o">.</span><span class="n">compat</span><span class="o">.</span><span class="n">urljoin</span><span class="p">(</span><span class="n">server</span><span class="p">[</span><span class="s1">&#39;url&#39;</span><span class="p">],</span> <span class="s1">&#39;api/sessions&#39;</span><span class="p">),</span>
+                                    <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;token&#39;</span><span class="p">:</span> <span class="n">server</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;token&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)})</span>
+
+            <span class="k">for</span> <span class="n">instance</span> <span class="ow">in</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">text</span><span class="p">):</span>
+                <span class="n">name</span> <span class="o">=</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;notebook&#39;</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+                <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">root_dir</span><span class="p">,</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;notebook&#39;</span><span class="p">][</span><span class="s1">&#39;path&#39;</span><span class="p">])</span>
+                <span class="n">kernel_id</span> <span class="o">=</span> <span class="n">instance</span><span class="p">[</span><span class="s1">&#39;kernel&#39;</span><span class="p">][</span><span class="s1">&#39;id&#39;</span><span class="p">]</span>
+
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+                    <span class="c1"># VSCode notebooks use tmp files with mangled names</span>
+                    <span class="c1"># Also, the path may be incorrect, and we can&#39;t fix that</span>
+                    <span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;-&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">name</span><span class="p">[:</span><span class="o">-</span><span class="mi">6</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">)[:</span><span class="o">-</span><span class="mi">5</span><span class="p">])</span> <span class="o">+</span> <span class="s1">&#39;.ipynb&#39;</span>
+                    <span class="n">path</span> <span class="o">=</span> <span class="s1">&#39;-&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">[:</span><span class="o">-</span><span class="mi">6</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">)[:</span><span class="o">-</span><span class="mi">10</span><span class="p">])</span> <span class="o">+</span> <span class="s1">&#39;.ipynb&#39;</span>
+
+                <span class="n">notebook_info</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="n">Resource</span><span class="o">.</span><span class="n">NAME</span> <span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+                    <span class="n">Resource</span><span class="o">.</span><span class="n">PATH</span> <span class="p">:</span> <span class="n">path</span><span class="p">,</span>
+                    <span class="n">Resource</span><span class="o">.</span><span class="n">KERNEL</span> <span class="p">:</span> <span class="n">kernel_id</span><span class="p">,</span>
+                <span class="p">}</span>
+                <span class="n">notebook_table</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">notebook_info</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[</span><span class="s1">&#39;notebook_table&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">notebook_table</span>
+        <span class="k">return</span> <span class="n">notebook_table</span>
+
+    <span class="k">def</span> <span class="nf">get_python_pids</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; PIDs of processes, which have `python` in its name. &quot;&quot;&quot;</span>
+        <span class="n">python_pids</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">pid</span> <span class="ow">in</span> <span class="n">psutil</span><span class="o">.</span><span class="n">pids</span><span class="p">():</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">pid_to_name</span><span class="p">(</span><span class="n">pid</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s1">&#39;python&#39;</span> <span class="ow">in</span> <span class="n">name</span><span class="p">:</span>
+                <span class="n">python_pids</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">pid</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">python_pids</span>
+
+    <span class="k">def</span> <span class="nf">get_process_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">formatter</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Collect information about all Python processes.</span>
+<span class="sd">        Information varies from process properties (its path, PID, NGID, status, etc) to system resource usage like</span>
+<span class="sd">        CPU utilization or RSS. The table also includes some inferred columns like type and kernel_id.</span>
+
+<span class="sd">        Some of the fields are intentionally left blank / with meaningless defaults: those are supposed to be filled by</span>
+<span class="sd">        later merges / updates of the multiple tables. For example, processes that contain `kernel_id` in the name are</span>
+<span class="sd">        matched on `kernel_id` with the result of `get_notebook_table` to fill in correct names and paths.</span>
+
+<span class="sd">        If those fields are not updated with correct info, they would break table formatting: mainly, sorting and</span>
+<span class="sd">        filtering. This is a good thing, as such occasions signal about something very wrong and unexpected.</span>
+<span class="sd">        An example of this is an abandoned Jupyter Notebook, not managed by its Jupyter Server, or a host process, for</span>
+<span class="sd">        some reasons visible inside the container.</span>
+
+<span class="sd">        As `NBStat` can be run inside the container which has different namespace to the host, we are trying to match</span>
+<span class="sd">        PIDs of the processes to the ones on the host. That is what the `NGID` column for: later we use</span>
+<span class="sd">        either PIDs or NGIDs (whichever matches the DEVICE_PIDs) to merge with device information.</span>
+<span class="sd">        This fallback should be easy to extend once we find new ways of inferring the host PID of a process.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">formatter</span> <span class="o">=</span> <span class="n">formatter</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">formatter</span>
+
+        <span class="n">python_pids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_python_pids</span><span class="p">()</span>
+
+        <span class="n">process_table</span> <span class="o">=</span> <span class="n">ResourceTable</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">pid</span> <span class="ow">in</span> <span class="n">python_pids</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">process</span> <span class="o">=</span> <span class="n">psutil</span><span class="o">.</span><span class="n">Process</span><span class="p">(</span><span class="n">pid</span><span class="p">)</span>
+                <span class="n">pid</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">pid</span>
+
+                <span class="k">with</span> <span class="n">process</span><span class="o">.</span><span class="n">oneshot</span><span class="p">():</span>
+                    <span class="c1"># Command used to start the Python interpreter</span>
+                    <span class="n">cmdline</span> <span class="o">=</span> <span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">process</span><span class="o">.</span><span class="n">cmdline</span><span class="p">())</span>
+
+                    <span class="c1"># cwd with a default: access can be denied to current user</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">cwd</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">cwd</span><span class="p">()</span>
+                    <span class="k">except</span> <span class="n">psutil</span><span class="o">.</span><span class="n">AccessDenied</span><span class="p">:</span>
+                        <span class="n">cwd</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+                    <span class="c1"># Determine the type, name and path of the python process</span>
+                    <span class="n">kernel_id</span> <span class="o">=</span> <span class="n">KERNEL_ID_SEARCHER</span><span class="p">(</span><span class="n">cmdline</span><span class="p">)</span>
+                    <span class="n">vscode_key</span> <span class="o">=</span> <span class="n">VSCODE_KEY_SEARCHER</span><span class="p">(</span><span class="n">cmdline</span><span class="p">)</span>
+                    <span class="n">script_name</span> <span class="o">=</span> <span class="n">SCRIPT_NAME_SEARCHER</span><span class="p">(</span><span class="n">cmdline</span><span class="p">)</span>
+                    <span class="n">exec_notebook_path</span> <span class="o">=</span> <span class="n">RUN_NOTEBOOK_PATH_SEARCHER</span><span class="p">(</span><span class="n">cmdline</span><span class="p">)</span>
+
+                    <span class="k">if</span> <span class="n">kernel_id</span><span class="p">:</span>
+                        <span class="c1"># The name will be changed by data from `notebook_table`.</span>
+                        <span class="c1"># If not, then something very fishy is going on.</span>
+                        <span class="n">type_</span> <span class="o">=</span> <span class="s1">&#39;notebook&#39;</span>
+                        <span class="n">name</span> <span class="o">=</span> <span class="n">kernel_id</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;.ipynb&#39;</span>
+                        <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">cwd</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+                        <span class="n">kernel_id</span> <span class="o">=</span> <span class="n">kernel_id</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+                    <span class="k">elif</span> <span class="n">vscode_key</span><span class="p">:</span>
+                        <span class="c1"># Can&#39;t tell much more for processes run by VSCode for now</span>
+                        <span class="n">type_</span> <span class="o">=</span> <span class="s1">&#39;vscode&#39;</span>
+                        <span class="n">name</span> <span class="o">=</span> <span class="n">vscode_key</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;.ipynb&#39;</span>
+                        <span class="n">path</span> <span class="o">=</span> <span class="n">kernel_id</span> <span class="o">=</span> <span class="n">vscode_key</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+                    <span class="k">elif</span> <span class="n">exec_notebook_path</span><span class="p">:</span>
+                        <span class="n">type_</span> <span class="o">=</span> <span class="s1">&#39;exec_notebook&#39;</span>
+                        <span class="n">name</span> <span class="o">=</span> <span class="n">get_exec_notebook_name</span><span class="p">(</span><span class="n">process</span><span class="o">.</span><span class="n">ppid</span><span class="p">())</span>
+                        <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">cwd</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+                        <span class="n">kernel_id</span> <span class="o">=</span> <span class="kc">None</span>
+                    <span class="k">elif</span> <span class="n">script_name</span><span class="p">:</span>
+                        <span class="n">type_</span> <span class="o">=</span> <span class="s1">&#39;script&#39;</span>
+                        <span class="n">name</span> <span class="o">=</span> <span class="n">script_name</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;.py&#39;</span>
+                        <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">cwd</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+                        <span class="n">kernel_id</span> <span class="o">=</span> <span class="kc">None</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">type_</span> <span class="o">=</span> <span class="s1">&#39;unknown&#39;</span>
+                        <span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;unknown&#39;</span>
+                        <span class="n">path</span> <span class="o">=</span> <span class="n">cwd</span>
+                        <span class="n">kernel_id</span> <span class="o">=</span> <span class="kc">None</span>
+
+                    <span class="c1"># PYTHON_PPID = PPID if parent is Python process else -1</span>
+                    <span class="n">ppid</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">ppid</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="n">type_</span> <span class="o">==</span> <span class="s1">&#39;exec_notebook&#39;</span><span class="p">:</span>
+                        <span class="c1"># Spawned by `exec_notebook` function of the library</span>
+                        <span class="n">python_ppid</span> <span class="o">=</span> <span class="n">ppid</span>
+                    <span class="k">elif</span> <span class="n">ppid</span> <span class="ow">in</span> <span class="n">python_pids</span><span class="p">:</span>
+                        <span class="c1"># Spawned by one of other Python processes</span>
+                        <span class="n">type_</span> <span class="o">=</span> <span class="s1">&#39;subprocess&#39;</span>
+                        <span class="n">python_ppid</span> <span class="o">=</span> <span class="n">ppid</span>
+                    <span class="k">elif</span> <span class="s1">&#39;containerd&#39;</span> <span class="ow">in</span> <span class="n">pid_to_name</span><span class="p">(</span><span class="n">ppid</span><span class="p">):</span>
+                        <span class="c1"># Something very wrong is going on</span>
+                        <span class="n">type_</span> <span class="o">=</span> <span class="s1">&#39;containerd&#39;</span>
+                        <span class="n">python_ppid</span> <span class="o">=</span> <span class="n">ppid</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="c1"># Spawned by non-Python process: terminal / Jupyter Server</span>
+                        <span class="n">python_ppid</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+
+                    <span class="c1"># Fill in the basic info</span>
+                    <span class="n">process_info</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">NAME</span> <span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">PATH</span> <span class="p">:</span> <span class="n">path</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">CMDLINE</span> <span class="p">:</span> <span class="n">cmdline</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">TYPE</span> <span class="p">:</span> <span class="n">type_</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">PID</span> <span class="p">:</span> <span class="n">pid</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">PPID</span> <span class="p">:</span> <span class="n">ppid</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">NGID</span> <span class="p">:</span> <span class="n">pid_to_ngid</span><span class="p">(</span><span class="n">pid</span><span class="p">),</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">PYTHON_PPID</span> <span class="p">:</span> <span class="n">python_ppid</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">CREATE_TIME</span> <span class="p">:</span> <span class="n">process</span><span class="o">.</span><span class="n">create_time</span><span class="p">(),</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">KERNEL</span> <span class="p">:</span> <span class="n">kernel_id</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">STATUS</span> <span class="p">:</span> <span class="n">process</span><span class="o">.</span><span class="n">status</span><span class="p">(),</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">PROCESS</span> <span class="p">:</span> <span class="n">process</span>
+                    <span class="p">}</span>
+
+                    <span class="c1"># Gather resource info</span>
+                    <span class="k">if</span> <span class="n">formatter</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">CPU</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+                        <span class="n">process_info</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">CPU</span><span class="p">]</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">cpu_percent</span><span class="p">()</span>
+
+                    <span class="k">if</span> <span class="n">formatter</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">RSS</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+                        <span class="n">memory</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">memory_info</span><span class="p">()</span>
+                        <span class="n">process_info</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">RSS</span><span class="p">]</span> <span class="o">=</span> <span class="n">memory</span><span class="o">.</span><span class="n">rss</span>
+
+                <span class="n">process_table</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">process_info</span><span class="p">)</span>
+
+            <span class="k">except</span> <span class="p">(</span><span class="n">psutil</span><span class="o">.</span><span class="n">AccessDenied</span><span class="p">,</span> <span class="n">psutil</span><span class="o">.</span><span class="n">ZombieProcess</span><span class="p">,</span> <span class="n">psutil</span><span class="o">.</span><span class="n">NoSuchProcess</span><span class="p">,</span> <span class="ne">FileNotFoundError</span><span class="p">):</span>
+                <span class="k">continue</span>
+
+        <span class="c1"># Postprocess the table: update some entries with info from the others</span>
+        <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">process_table</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">entry</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">NAME</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;unknown&#39;</span> <span class="ow">and</span> <span class="s1">&#39;multiprocess&#39;</span> <span class="ow">in</span> <span class="n">entry</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">CMDLINE</span><span class="p">]:</span>
+                <span class="n">ppid</span> <span class="o">=</span> <span class="n">entry</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">PPID</span><span class="p">]</span>
+
+                <span class="k">for</span> <span class="n">entry_</span> <span class="ow">in</span> <span class="n">process_table</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">entry_</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">PID</span><span class="p">]</span> <span class="o">==</span> <span class="n">ppid</span> <span class="ow">and</span> <span class="n">entry_</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">PYTHON_PPID</span><span class="p">]</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+                        <span class="n">entry</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">key</span> <span class="p">:</span> <span class="n">entry_</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">NAME</span><span class="p">,</span> <span class="n">Resource</span><span class="o">.</span><span class="n">PATH</span><span class="p">,</span> <span class="n">Resource</span><span class="o">.</span><span class="n">KERNEL</span><span class="p">]})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[</span><span class="s1">&#39;process_table&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">process_table</span>
+        <span class="k">return</span> <span class="n">process_table</span>
+
+
+    <span class="c1"># Aggregate multiple ResourceTables into more representative tables</span>
+    <span class="k">def</span> <span class="nf">make_nbstat_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">formatter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">20</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Prepare a `nbstat` view: a table, indexed by script/notebook name, with info about each of its processes.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        sort : bool</span>
+<span class="sd">            If True, then the table is sorted in the following order:</span>
+<span class="sd">                - notebook name, which is used as table index</span>
+<span class="sd">                - for each notebook, we display its process as the first row</span>
+<span class="sd">                - then all device processes, sorted by device ID</span>
+<span class="sd">                - then all other processes, sorted by create time</span>
+<span class="sd">        verbose : {0, 1, 2}</span>
+<span class="sd">            Sets the filtration of the table.</span>
+<span class="sd">            If 0, then we keep only notebooks, which use at least one device. For them we keep only device processes.</span>
+<span class="sd">            If 1, then we keep only notebooks, which use at least one device. For them we keep all processes.</span>
+<span class="sd">            If 2, then we keep all notebooks and all processes for them.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Collect all the data</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">device_process_table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_device_table</span><span class="p">(</span><span class="n">formatter</span><span class="o">=</span><span class="n">formatter</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="n">window</span><span class="p">)</span> <span class="c1"># ~20% of the time taken</span>
+        <span class="n">notebook_table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_notebook_table</span><span class="p">(</span><span class="n">formatter</span><span class="o">=</span><span class="n">formatter</span><span class="p">)</span>                       <span class="c1"># ~15% of the time taken</span>
+        <span class="n">process_table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_process_table</span><span class="p">(</span><span class="n">formatter</span><span class="o">=</span><span class="n">formatter</span><span class="p">)</span>                         <span class="c1"># ~45% of the time taken</span>
+
+        <span class="c1"># Try to match the process pids (local namespace) to device pids (host). Merge on those</span>
+        <span class="n">table</span> <span class="o">=</span> <span class="n">process_table</span>
+        <span class="k">if</span> <span class="n">device_process_table</span><span class="p">:</span>
+            <span class="n">device_pids</span> <span class="o">=</span> <span class="n">device_process_table</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_PROCESS_PID</span><span class="p">]</span>
+
+            <span class="k">def</span> <span class="nf">select_pid</span><span class="p">(</span><span class="n">entry</span><span class="p">):</span>
+                <span class="n">pid</span> <span class="o">=</span> <span class="n">entry</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">PID</span><span class="p">]</span>
+                <span class="n">ngid</span> <span class="o">=</span> <span class="n">entry</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">NGID</span><span class="p">]</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">ngid</span> <span class="k">if</span> <span class="n">ngid</span> <span class="ow">in</span> <span class="n">device_pids</span> <span class="k">else</span> <span class="n">pid</span>
+                <span class="k">return</span> <span class="n">result</span>
+
+            <span class="n">table</span><span class="o">.</span><span class="n">add_column</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">HOST_PID</span><span class="p">,</span> <span class="n">select_pid</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">nbstat_check_device_pids</span><span class="p">(</span><span class="n">device_pids</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">add_to_table</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="n">table</span> <span class="o">=</span> <span class="n">ResourceTable</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">table</span><span class="p">,</span> <span class="n">device_process_table</span><span class="p">,</span>
+                                        <span class="n">self_key</span><span class="o">=</span><span class="n">Resource</span><span class="o">.</span><span class="n">HOST_PID</span><span class="p">,</span> <span class="n">other_key</span><span class="o">=</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_PROCESS_PID</span><span class="p">)</span>
+
+        <span class="c1"># Update entries: change `path` and `name` for Notebook from placeholders to proper ones</span>
+        <span class="k">if</span> <span class="n">notebook_table</span><span class="p">:</span>
+            <span class="n">table</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">notebook_table</span><span class="p">,</span> <span class="n">self_key</span><span class="o">=</span><span class="n">Resource</span><span class="o">.</span><span class="n">KERNEL</span><span class="p">,</span> <span class="n">other_key</span><span class="o">=</span><span class="n">Resource</span><span class="o">.</span><span class="n">KERNEL</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># Custom sort for processes: parent -&gt; device processes -&gt; non-device processes -&gt; create time</span>
+        <span class="k">if</span> <span class="n">sort</span><span class="p">:</span>
+            <span class="n">is_parent</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">entry</span><span class="p">:</span> <span class="n">entry</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">PYTHON_PPID</span><span class="p">]</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span>
+            <span class="n">table</span><span class="o">.</span><span class="n">add_column</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">IS_PARENT</span><span class="p">,</span> <span class="n">is_parent</span><span class="p">)</span>
+
+            <span class="n">table</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">IS_PARENT</span><span class="p">,</span> <span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_ID</span><span class="p">,</span> <span class="n">Resource</span><span class="o">.</span><span class="n">CREATE_TIME</span><span class="p">],</span>
+                       <span class="n">reverse</span><span class="o">=</span><span class="p">[</span><span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mi">999</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">])</span>
+
+        <span class="c1"># Filter non-device processes</span>
+        <span class="k">if</span> <span class="n">verbose</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">function</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">entry</span><span class="p">:</span> <span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_ID</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">entry</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">PYTHON_PPID</span><span class="p">]</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">table</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># Sort index on create time</span>
+        <span class="n">table</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">PATH</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sort</span><span class="p">:</span>
+            <span class="n">uses_device</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">entry</span><span class="p">:</span> <span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_ID</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="n">table</span><span class="o">.</span><span class="n">add_column</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">USES_DEVICE</span><span class="p">,</span> <span class="n">uses_device</span><span class="p">)</span>
+            <span class="n">table</span><span class="o">.</span><span class="n">sort_by_index</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">USES_DEVICE</span><span class="p">,</span> <span class="n">Resource</span><span class="o">.</span><span class="n">CREATE_TIME</span><span class="p">),</span>
+                                <span class="n">reverse</span><span class="o">=</span><span class="p">[</span><span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">],</span> <span class="n">aggregation</span><span class="o">=</span><span class="p">[</span><span class="nb">max</span><span class="p">,</span> <span class="nb">min</span><span class="p">])</span>
+
+        <span class="c1"># Filter non-device notebooks</span>
+        <span class="k">if</span> <span class="n">verbose</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">function</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">entry</span><span class="p">:</span> <span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_ID</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="n">table</span><span class="o">.</span><span class="n">filter_by_index</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">table</span>
+
+    <span class="k">def</span> <span class="nf">make_devicestat_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">formatter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">20</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; A transposed `nbstat` view: the same information, but indexed with device ids. &quot;&quot;&quot;</span>
+        <span class="n">device_table</span><span class="p">,</span> <span class="n">device_process_table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_device_table</span><span class="p">(</span><span class="n">formatter</span><span class="o">=</span><span class="n">formatter</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="n">window</span><span class="p">)</span>
+        <span class="n">notebook_table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_notebook_table</span><span class="p">(</span><span class="n">formatter</span><span class="o">=</span><span class="n">formatter</span><span class="p">)</span>
+        <span class="n">process_table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_process_table</span><span class="p">(</span><span class="n">formatter</span><span class="o">=</span><span class="n">formatter</span><span class="p">)</span>
+
+        <span class="c1"># Try to match the process pids (local namespace) to device pids (host). Merge on those</span>
+        <span class="n">device_pids</span> <span class="o">=</span> <span class="n">device_process_table</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_PROCESS_PID</span><span class="p">]</span>
+        <span class="k">def</span> <span class="nf">select_pid</span><span class="p">(</span><span class="n">entry</span><span class="p">):</span>
+            <span class="n">pid</span> <span class="o">=</span> <span class="n">entry</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">PID</span><span class="p">]</span>
+            <span class="n">ngid</span> <span class="o">=</span> <span class="n">entry</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">NGID</span><span class="p">]</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">ngid</span> <span class="k">if</span> <span class="n">ngid</span> <span class="ow">in</span> <span class="n">device_pids</span> <span class="k">else</span> <span class="n">pid</span>
+            <span class="k">return</span> <span class="n">result</span>
+        <span class="n">process_table</span><span class="o">.</span><span class="n">add_column</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">HOST_PID</span><span class="p">,</span> <span class="n">select_pid</span><span class="p">)</span>
+
+        <span class="n">table</span> <span class="o">=</span> <span class="n">device_table</span><span class="o">.</span><span class="n">unroll</span><span class="p">(</span><span class="n">inplace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">process_table</span><span class="p">:</span>
+            <span class="n">table</span> <span class="o">=</span> <span class="n">table</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">process_table</span><span class="p">,</span> <span class="n">self_key</span><span class="o">=</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_PROCESS_PID</span><span class="p">,</span> <span class="n">other_key</span><span class="o">=</span><span class="n">Resource</span><span class="o">.</span><span class="n">HOST_PID</span><span class="p">)</span>
+
+        <span class="c1"># Update entries: change `path` and `name` for Notebook from placeholders to proper ones</span>
+        <span class="k">if</span> <span class="n">notebook_table</span><span class="p">:</span>
+            <span class="n">table</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">notebook_table</span><span class="p">,</span> <span class="n">self_key</span><span class="o">=</span><span class="n">Resource</span><span class="o">.</span><span class="n">KERNEL</span><span class="p">,</span> <span class="n">other_key</span><span class="o">=</span><span class="n">Resource</span><span class="o">.</span><span class="n">KERNEL</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">devicestat_check_device_pids</span><span class="p">(</span><span class="n">table</span><span class="p">)</span>
+
+        <span class="c1"># A simple sort of entries and index</span>
+        <span class="n">table</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">Resource</span><span class="o">.</span><span class="n">CREATE_TIME</span><span class="p">,</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">table</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_ID</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">table</span><span class="o">.</span><span class="n">sort_by_index</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_ID</span><span class="p">,</span> <span class="n">aggregation</span><span class="o">=</span><span class="nb">min</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">table</span>
+
+    <span class="k">def</span> <span class="nf">make_gpustat_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">formatter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">20</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; A device-only view. Same information, as vanilla `gpustat`. &quot;&quot;&quot;</span>
+        <span class="n">device_table</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_device_table</span><span class="p">(</span><span class="n">formatter</span><span class="o">=</span><span class="n">formatter</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="n">window</span><span class="p">)</span>
+        <span class="n">device_table</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_ID</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">device_table</span>
+
+
+    <span class="c1"># Check for information consistency in multiple tables</span>
+    <span class="k">def</span> <span class="nf">nbstat_check_device_pids</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device_pids</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">add_to_table</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Check if some of `device pids` are not referenced in the `table`.</span>
+<span class="sd">        Add them with template names and values, if needed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">set_device_pids</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">device_pids</span><span class="p">)</span>
+        <span class="n">set_host_pids</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">table</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">HOST_PID</span><span class="p">])</span>
+        <span class="k">if</span> <span class="kc">None</span> <span class="ow">in</span> <span class="n">set_device_pids</span><span class="p">:</span>
+            <span class="n">set_device_pids</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="kc">None</span> <span class="ow">in</span> <span class="n">set_host_pids</span><span class="p">:</span>
+            <span class="n">set_host_pids</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">set_device_pids</span> <span class="o">!=</span> <span class="n">set_host_pids</span><span class="p">:</span>
+            <span class="n">missing_pids</span> <span class="o">=</span> <span class="n">set_device_pids</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span><span class="n">set_host_pids</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">warnings</span><span class="p">[</span><span class="s1">&#39;missing_device_pids&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">missing_pids</span>
+
+            <span class="k">if</span> <span class="n">add_to_table</span><span class="p">:</span>
+                <span class="n">entry_template</span> <span class="o">=</span> <span class="p">{</span><span class="n">key</span> <span class="p">:</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">table</span><span class="o">.</span><span class="n">columns</span> <span class="ow">or</span> <span class="p">[]}</span>
+                <span class="k">for</span> <span class="n">missing_pid</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">missing_pids</span><span class="p">):</span>
+                    <span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;non-python&#39;</span> <span class="k">if</span> <span class="n">psutil</span><span class="o">.</span><span class="n">pid_exists</span><span class="p">(</span><span class="n">missing_pid</span><span class="p">)</span> <span class="k">else</span> <span class="s1">&#39;device_zombie&#39;</span>
+
+                    <span class="n">entry</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="o">**</span><span class="n">entry_template</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">NAME</span> <span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">TYPE</span> <span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">PATH</span> <span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">STATUS</span> <span class="p">:</span> <span class="s1">&#39;sleeping&#39;</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">PID</span> <span class="p">:</span> <span class="n">missing_pid</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">PPID</span> <span class="p">:</span> <span class="n">missing_pid</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">NGID</span> <span class="p">:</span> <span class="n">missing_pid</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">HOST_PID</span> <span class="p">:</span> <span class="n">missing_pid</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">PYTHON_PPID</span> <span class="p">:</span> <span class="n">missing_pid</span><span class="p">,</span>
+                        <span class="n">Resource</span><span class="o">.</span><span class="n">CREATE_TIME</span> <span class="p">:</span> <span class="n">missing_pid</span><span class="p">,</span> <span class="c1"># for sort on `CREATE_TIME`</span>
+                    <span class="p">}</span>
+                    <span class="n">table</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">devicestat_check_device_pids</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">table</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Check if some of the `device pids` are not matched to any Python processes.</span>
+<span class="sd">        Add template names to them instead of empty ones.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">warnings</span><span class="p">[</span><span class="s1">&#39;missing_device_pids&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">table</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">entry</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_PROCESS_PID</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">entry</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">HOST_PID</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">missing_pid</span> <span class="o">=</span> <span class="n">entry</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_PROCESS_PID</span><span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">warnings</span><span class="p">[</span><span class="s1">&#39;missing_device_pids&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">missing_pid</span><span class="p">)</span>
+
+                <span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;non-python&#39;</span> <span class="k">if</span> <span class="n">psutil</span><span class="o">.</span><span class="n">pid_exists</span><span class="p">(</span><span class="n">missing_pid</span><span class="p">)</span> <span class="k">else</span> <span class="s1">&#39;device_zombie&#39;</span>
+                <span class="n">entry</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">Resource</span><span class="o">.</span><span class="n">NAME</span> <span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+                              <span class="n">Resource</span><span class="o">.</span><span class="n">TYPE</span> <span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+                              <span class="n">Resource</span><span class="o">.</span><span class="n">PATH</span> <span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+                              <span class="n">Resource</span><span class="o">.</span><span class="n">STATUS</span> <span class="p">:</span> <span class="s1">&#39;sleeping&#39;</span><span class="p">})</span>
+
+    <span class="c1"># Make formatted visualization of tables</span>
+    <span class="k">def</span> <span class="nf">get_view</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;nbstat&#39;</span><span class="p">,</span> <span class="n">formatter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">index_condition</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">force_styling</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                 <span class="n">sort</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                 <span class="n">add_header</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">underline_header</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">bold_header</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">separate_header</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                 <span class="n">separate_table</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                 <span class="n">add_footnote</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">underline_footnote</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">bold_footnote</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                 <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">underline_help</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">bold_help</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                 <span class="n">use_cache</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                 <span class="n">vertical_change</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                 <span class="n">separate_index</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">separator</span><span class="o">=</span><span class="s1">&#39;—&#39;</span><span class="p">,</span> <span class="n">hide_similar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                 <span class="n">process_memory_format</span><span class="o">=</span><span class="s1">&#39;GB&#39;</span><span class="p">,</span> <span class="n">device_memory_format</span><span class="o">=</span><span class="s1">&#39;MB&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Get the desired view. Format it into colored string.</span>
+<span class="sd">        Optionally, add a supheader (driver and CUDA info) and a footnote (total CPU / RSS usage) to the visualization.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">formatter</span> <span class="o">=</span> <span class="n">formatter</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">formatter</span>
+
+        <span class="c1"># Get the table from cache or re-compute it</span>
+        <span class="k">if</span> <span class="n">use_cache</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_available</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">formatter</span><span class="o">=</span><span class="n">formatter</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
+                                              <span class="n">interval</span><span class="o">=</span><span class="n">interval</span> <span class="o">*</span> <span class="mf">0.8</span><span class="p">):</span>
+            <span class="n">table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[</span><span class="s1">&#39;table&#39;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Compute the table</span>
+            <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;nb&#39;</span><span class="p">):</span>
+                <span class="n">table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_nbstat_table</span><span class="p">(</span><span class="n">formatter</span><span class="o">=</span><span class="n">formatter</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="n">sort</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="n">window</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;device&#39;</span><span class="p">):</span>
+                <span class="n">table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_devicestat_table</span><span class="p">(</span><span class="n">formatter</span><span class="o">=</span><span class="n">formatter</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="n">window</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;gpu&#39;</span><span class="p">):</span>
+                <span class="n">table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_gpustat_table</span><span class="p">(</span><span class="n">formatter</span><span class="o">=</span><span class="n">formatter</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="n">window</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Wrong name of view to get!&#39;</span><span class="p">)</span>
+
+            <span class="c1"># Filter some processes</span>
+            <span class="k">if</span> <span class="s1">&#39;nb&#39;</span> <span class="ow">in</span> <span class="n">name</span> <span class="ow">and</span> <span class="n">table</span><span class="p">:</span>
+                <span class="n">bad_names</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;lsp_server&#39;</span><span class="p">]</span>
+                <span class="n">function</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">index_value</span><span class="p">,</span> <span class="n">_</span><span class="p">:</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">name</span> <span class="ow">in</span> <span class="n">index_value</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">bad_names</span><span class="p">)</span>
+                <span class="n">table</span><span class="o">.</span><span class="n">filter_on_index</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="c1"># Filter index of the table by a regular expression</span>
+            <span class="k">if</span> <span class="n">table</span> <span class="ow">and</span> <span class="n">index_condition</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">function</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">index_value</span><span class="p">,</span> <span class="n">_</span><span class="p">:</span> <span class="nb">bool</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">index_condition</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">index_value</span><span class="p">)))</span>
+                <span class="n">table</span><span class="o">.</span><span class="n">filter_on_index</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="c1"># Store the table into cache along with the parameters of its creation</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="o">.</span><span class="n">update</span><span class="p">({</span>
+                <span class="s1">&#39;table&#39;</span><span class="p">:</span> <span class="n">table</span><span class="p">,</span>
+                <span class="s1">&#39;time&#39;</span><span class="p">:</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">(),</span>
+                <span class="s1">&#39;parameters&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+                    <span class="s1">&#39;n_formatter&#39;</span><span class="p">:</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">column</span><span class="p">[</span><span class="s1">&#39;include&#39;</span><span class="p">])</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">formatter</span><span class="p">),</span>
+                    <span class="s1">&#39;sort&#39;</span><span class="p">:</span> <span class="n">sort</span><span class="p">,</span>
+                    <span class="s1">&#39;verbose&#39;</span><span class="p">:</span> <span class="n">verbose</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">})</span>
+
+        <span class="c1"># Create terminal instance</span>
+        <span class="n">terminal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_terminal</span><span class="p">(</span><span class="n">force_styling</span><span class="o">=</span><span class="n">force_styling</span><span class="p">,</span> <span class="n">separator</span><span class="o">=</span><span class="n">separator</span><span class="p">)</span>
+
+        <span class="c1"># Make formatted strings</span>
+        <span class="n">lines</span> <span class="o">=</span> <span class="n">table</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">terminal</span><span class="o">=</span><span class="n">terminal</span><span class="p">,</span> <span class="n">formatter</span><span class="o">=</span><span class="n">formatter</span><span class="p">,</span>
+                             <span class="n">add_header</span><span class="o">=</span><span class="n">add_header</span><span class="p">,</span> <span class="n">underline_header</span><span class="o">=</span><span class="n">underline_header</span><span class="p">,</span> <span class="n">bold_header</span><span class="o">=</span><span class="n">bold_header</span><span class="p">,</span>
+                             <span class="n">separate_header</span><span class="o">=</span><span class="n">separate_header</span><span class="p">,</span>
+                             <span class="n">separate_index</span><span class="o">=</span><span class="n">separate_index</span><span class="p">,</span> <span class="n">hide_similar</span><span class="o">=</span><span class="n">hide_similar</span><span class="p">,</span>
+                             <span class="n">process_memory_format</span><span class="o">=</span><span class="n">process_memory_format</span><span class="p">,</span> <span class="n">device_memory_format</span><span class="o">=</span><span class="n">device_memory_format</span><span class="p">)</span>
+
+        <span class="c1"># Placeholder for empty table</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">table</span><span class="p">:</span>
+            <span class="n">width</span> <span class="o">=</span> <span class="n">terminal</span><span class="o">.</span><span class="n">length</span><span class="p">(</span><span class="n">lines</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">placeholder</span> <span class="o">=</span> <span class="n">terminal</span><span class="o">.</span><span class="n">center</span><span class="p">(</span><span class="n">terminal</span><span class="o">.</span><span class="n">bold</span> <span class="o">+</span> <span class="s1">&#39;---no entries to display---&#39;</span> <span class="o">+</span> <span class="n">terminal</span><span class="o">.</span><span class="n">normal</span><span class="p">,</span> <span class="n">width</span><span class="p">)</span>
+            <span class="n">lines</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">placeholder</span><span class="p">)</span>
+
+        <span class="c1"># Additional line elements: separator, footnote, help</span>
+        <span class="k">if</span> <span class="n">separate_table</span><span class="p">:</span>
+            <span class="n">separator</span> <span class="o">=</span> <span class="n">terminal</span><span class="o">.</span><span class="n">bold</span> <span class="o">+</span> <span class="s1">&#39;-&#39;</span> <span class="o">*</span> <span class="n">terminal</span><span class="o">.</span><span class="n">length</span><span class="p">(</span><span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">separator</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">add_footnote</span><span class="p">:</span>
+            <span class="n">lines</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">add_footnote</span><span class="p">(</span><span class="n">lines</span><span class="p">,</span> <span class="n">terminal</span><span class="o">=</span><span class="n">terminal</span><span class="p">,</span>
+                                      <span class="n">underline</span><span class="o">=</span><span class="n">underline_footnote</span><span class="p">,</span> <span class="n">bold</span><span class="o">=</span><span class="n">bold_footnote</span><span class="p">,</span>
+                                      <span class="n">process_memory_format</span><span class="o">=</span><span class="n">process_memory_format</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">add_help</span><span class="p">:</span>
+            <span class="n">lines</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">add_help</span><span class="p">(</span><span class="n">lines</span><span class="p">,</span> <span class="n">terminal</span><span class="o">=</span><span class="n">terminal</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+                                  <span class="n">underline</span><span class="o">=</span><span class="n">underline_help</span><span class="p">,</span> <span class="n">bold</span><span class="o">=</span><span class="n">bold_help</span><span class="p">)</span>
+
+        <span class="c1"># Select visible lines: keep header / footnote+help, move just the index items</span>
+        <span class="k">if</span> <span class="s1">&#39;watch&#39;</span> <span class="ow">in</span> <span class="n">name</span><span class="p">:</span>
+            <span class="n">v_start</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">add_header</span><span class="p">)</span> <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">separate_header</span><span class="p">)</span>
+            <span class="n">v_end</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">separate_table</span><span class="p">)</span> <span class="o">+</span> <span class="mi">2</span><span class="o">*</span><span class="nb">int</span><span class="p">(</span><span class="n">add_footnote</span><span class="p">)</span> <span class="o">+</span> <span class="mi">2</span><span class="o">*</span><span class="nb">int</span><span class="p">(</span><span class="n">add_help</span><span class="p">)</span>
+            <span class="n">v_size</span> <span class="o">=</span> <span class="n">terminal</span><span class="o">.</span><span class="n">height</span> <span class="o">-</span> <span class="n">v_start</span> <span class="o">-</span> <span class="n">v_end</span> <span class="o">-</span> <span class="mi">5</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_v_position</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_v_position</span> <span class="o">+</span> <span class="n">vertical_change</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span> <span class="o">-</span> <span class="n">v_start</span> <span class="o">-</span> <span class="n">v_end</span> <span class="o">-</span> <span class="n">v_size</span><span class="p">))</span>
+            <span class="n">v_slice_start</span> <span class="o">=</span> <span class="n">v_start</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_v_position</span>
+            <span class="n">v_slice_end</span> <span class="o">=</span> <span class="n">v_slice_start</span> <span class="o">+</span> <span class="n">v_size</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">terminal</span><span class="o">.</span><span class="n">height</span><span class="p">:</span>
+                <span class="n">lines</span> <span class="o">=</span> <span class="n">lines</span><span class="p">[:</span><span class="n">v_start</span><span class="p">]</span> <span class="o">+</span> <span class="n">lines</span><span class="p">[</span><span class="n">v_slice_start</span> <span class="p">:</span> <span class="n">v_slice_end</span><span class="p">]</span> <span class="o">+</span> <span class="n">lines</span><span class="p">[</span><span class="o">-</span><span class="p">(</span><span class="n">v_end</span> <span class="ow">or</span> <span class="mi">1</span><span class="p">):]</span>
+
+        <span class="k">return</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span> <span class="o">+</span> <span class="n">terminal</span><span class="o">.</span><span class="n">normal</span>
+
+
+    <span class="k">def</span> <span class="nf">cache_available</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">formatter</span><span class="p">,</span> <span class="n">verbose</span><span class="p">,</span> <span class="n">interval</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Check if the stored cache is fresh enough to re-use it. &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span> <span class="ow">or</span> <span class="s1">&#39;table&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">if</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[</span><span class="s1">&#39;time&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">interval</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">if</span> <span class="n">name</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[</span><span class="s1">&#39;parameters&#39;</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">if</span> <span class="n">verbose</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[</span><span class="s1">&#39;parameters&#39;</span><span class="p">][</span><span class="s1">&#39;verbose&#39;</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="n">n_formatter</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">column</span><span class="p">[</span><span class="s1">&#39;include&#39;</span><span class="p">])</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">formatter</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">n_formatter</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[</span><span class="s1">&#39;parameters&#39;</span><span class="p">][</span><span class="s1">&#39;n_formatter&#39;</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">return</span> <span class="kc">True</span>
+
+
+    <span class="k">def</span> <span class="nf">make_terminal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">force_styling</span><span class="p">,</span> <span class="n">separator</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Create terminal instance. &quot;&quot;&quot;</span>
+        <span class="n">terminal</span> <span class="o">=</span> <span class="n">Terminal</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;TERM&#39;</span><span class="p">),</span> <span class="n">force_styling</span><span class="o">=</span><span class="n">force_styling</span> <span class="k">if</span> <span class="n">force_styling</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">terminal</span><span class="o">.</span><span class="n">separator_symbol</span> <span class="o">=</span> <span class="n">separator</span>
+        <span class="n">terminal</span><span class="o">.</span><span class="n">_normal</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\x1b</span><span class="s1">[0;10m&#39;</span> <span class="c1"># pylint: disable=protected-access</span>
+
+        <span class="c1"># Change some methods to a faster versions</span>
+        <span class="c1"># TODO: better measurements and tests for the same outputs</span>
+        <span class="n">terminal</span><span class="o">.</span><span class="n">length</span> <span class="o">=</span> <span class="n">true_len</span>
+        <span class="n">terminal</span><span class="o">.</span><span class="n">rjust</span> <span class="o">=</span> <span class="n">true_rjust</span>
+        <span class="n">terminal</span><span class="o">.</span><span class="n">center</span> <span class="o">=</span> <span class="n">true_center</span>
+        <span class="k">return</span> <span class="n">terminal</span>
+
+    <span class="k">def</span> <span class="nf">add_line</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lines</span><span class="p">,</span> <span class="n">parts</span><span class="p">,</span> <span class="n">terminal</span><span class="p">,</span> <span class="n">position</span><span class="p">,</span> <span class="n">separator_position</span><span class="p">,</span> <span class="n">underline</span><span class="p">,</span> <span class="n">bold</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Add line, created from joined `parts`, to `lines`, in desired `position`. &quot;&quot;&quot;</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="p">[</span><span class="n">part</span> <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">parts</span> <span class="k">if</span> <span class="n">part</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">underline</span><span class="p">:</span>
+            <span class="n">parts</span> <span class="o">=</span> <span class="p">[</span><span class="n">terminal</span><span class="o">.</span><span class="n">underline</span> <span class="o">+</span> <span class="n">part</span> <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">parts</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">bold</span><span class="p">:</span>
+            <span class="n">parts</span> <span class="o">=</span> <span class="p">[</span><span class="n">terminal</span><span class="o">.</span><span class="n">bold</span> <span class="o">+</span> <span class="n">part</span> <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">parts</span><span class="p">]</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="p">[</span><span class="n">part</span> <span class="o">+</span> <span class="n">terminal</span><span class="o">.</span><span class="n">normal</span> <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">parts</span><span class="p">]</span>
+        <span class="n">added_line</span> <span class="o">=</span> <span class="s1">&#39;    &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span>
+
+        <span class="n">added_line_width</span> <span class="o">=</span> <span class="n">terminal</span><span class="o">.</span><span class="n">length</span><span class="p">(</span><span class="n">added_line</span><span class="p">)</span>
+        <span class="n">table_width</span> <span class="o">=</span> <span class="n">terminal</span><span class="o">.</span><span class="n">length</span><span class="p">(</span><span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="n">added_line_width</span> <span class="o">&lt;=</span> <span class="n">table_width</span><span class="p">:</span>
+            <span class="n">added_line</span> <span class="o">=</span> <span class="n">terminal</span><span class="o">.</span><span class="n">rjust</span><span class="p">(</span><span class="n">added_line</span><span class="p">,</span> <span class="n">table_width</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">lines</span> <span class="o">=</span> <span class="p">[</span><span class="n">terminal</span><span class="o">.</span><span class="n">rjust</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="n">added_line_width</span><span class="p">)</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">]</span>
+        <span class="n">lines</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">position</span><span class="p">,</span> <span class="n">added_line</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">separator_position</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">lines</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">separator_position</span><span class="p">,</span> <span class="n">terminal</span><span class="o">.</span><span class="n">separator_symbol</span> <span class="o">*</span> <span class="n">terminal</span><span class="o">.</span><span class="n">length</span><span class="p">(</span><span class="n">added_line</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">lines</span>
+
+
+    <span class="k">def</span> <span class="nf">add_footnote</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lines</span><span class="p">,</span> <span class="n">terminal</span><span class="p">,</span> <span class="n">underline</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">bold</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">process_memory_format</span><span class="o">=</span><span class="s1">&#39;GB&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Add a footnote with info about current CPU, RSS and GPU usage. &quot;&quot;&quot;</span>
+        <span class="c1"># N running notebooks, number of used devices</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="s1">&#39;notebook_table&#39;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">:</span>
+            <span class="n">n_notebooks</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[</span><span class="s1">&#39;notebook_table&#39;</span><span class="p">])</span>
+            <span class="n">parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">terminal</span><span class="o">.</span><span class="n">pink</span><span class="si">}</span><span class="s1"># KERNELS: </span><span class="si">{</span><span class="n">n_notebooks</span><span class="si">:</span><span class="s1">&gt;3</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s1">&#39;device_table&#39;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">:</span>
+            <span class="n">n_used_devices</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">bool</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="n">Resource</span><span class="o">.</span><span class="n">DEVICE_PROCESS_N</span><span class="p">])</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[</span><span class="s1">&#39;device_table&#39;</span><span class="p">])</span>
+            <span class="n">n_total_devices</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">[</span><span class="s1">&#39;device_table&#39;</span><span class="p">])</span>
+            <span class="n">parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">terminal</span><span class="o">.</span><span class="n">green</span><span class="si">}</span><span class="s1">DEVICES USED: </span><span class="si">{</span><span class="n">n_used_devices</span><span class="si">}</span><span class="s1"> / </span><span class="si">{</span><span class="n">n_total_devices</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">parts</span><span class="p">:</span>
+            <span class="n">lines</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">add_line</span><span class="p">(</span><span class="n">lines</span><span class="o">=</span><span class="n">lines</span><span class="p">,</span> <span class="n">parts</span><span class="o">=</span><span class="n">parts</span><span class="p">,</span> <span class="n">terminal</span><span class="o">=</span><span class="n">terminal</span><span class="p">,</span>
+                                <span class="n">position</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">),</span> <span class="n">separator_position</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                                <span class="n">underline</span><span class="o">=</span><span class="n">underline</span><span class="p">,</span> <span class="n">bold</span><span class="o">=</span><span class="n">bold</span><span class="p">)</span>
+
+        <span class="c1"># System info</span>
+        <span class="n">timestamp</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">&#39;%Y-%m-</span><span class="si">%d</span><span class="s1"> %H:%M:%S&#39;</span><span class="p">)</span>
+        <span class="n">vm</span> <span class="o">=</span> <span class="n">psutil</span><span class="o">.</span><span class="n">virtual_memory</span><span class="p">()</span>
+        <span class="n">vm_used</span><span class="p">,</span> <span class="n">unit</span> <span class="o">=</span> <span class="n">format_memory</span><span class="p">(</span><span class="n">vm</span><span class="o">.</span><span class="n">used</span><span class="p">,</span> <span class="n">process_memory_format</span><span class="p">)</span>
+        <span class="n">vm_total</span><span class="p">,</span> <span class="n">unit</span> <span class="o">=</span> <span class="n">format_memory</span><span class="p">(</span><span class="n">vm</span><span class="o">.</span><span class="n">total</span><span class="p">,</span> <span class="n">process_memory_format</span><span class="p">)</span>
+        <span class="n">n_digits</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">vm_total</span><span class="p">))</span>
+
+        <span class="n">parts</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">timestamp</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;CPU: </span><span class="si">{</span><span class="n">psutil</span><span class="o">.</span><span class="n">cpu_percent</span><span class="p">()</span><span class="si">:</span><span class="s1">6</span><span class="si">}</span><span class="s1">%&#39;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s1">&#39;RSS: </span><span class="si">{</span><span class="n">vm_used</span><span class="si">:</span><span class="s1">&gt;</span><span class="si">{</span><span class="n">n_digits</span><span class="si">}}</span><span class="s1"> / </span><span class="si">{</span><span class="n">vm_total</span><span class="si">}</span><span class="s1"> </span><span class="si">{</span><span class="n">unit</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="p">[</span><span class="n">terminal</span><span class="o">.</span><span class="n">cyan</span> <span class="o">+</span> <span class="n">part</span> <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">parts</span><span class="p">]</span>
+
+        <span class="n">lines</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">add_line</span><span class="p">(</span><span class="n">lines</span><span class="o">=</span><span class="n">lines</span><span class="p">,</span> <span class="n">parts</span><span class="o">=</span><span class="n">parts</span><span class="p">,</span> <span class="n">terminal</span><span class="o">=</span><span class="n">terminal</span><span class="p">,</span>
+                              <span class="n">position</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">),</span> <span class="n">separator_position</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                              <span class="n">underline</span><span class="o">=</span><span class="n">underline</span><span class="p">,</span> <span class="n">bold</span><span class="o">=</span><span class="n">bold</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">lines</span>
+
+    <span class="k">def</span> <span class="nf">add_help</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lines</span><span class="p">,</span> <span class="n">terminal</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">underline</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">bold</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Add a footnote with info about current CPU and RSS usage. &quot;&quot;&quot;</span>
+        <span class="c1"># General controls</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s1">&#39;TAB: SWITCH VIEWS&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;V: VERBOSITY&#39;</span> <span class="k">if</span> <span class="s1">&#39;nb&#39;</span> <span class="ow">in</span> <span class="n">name</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s1">&#39;S: SEPARATORS&#39;</span><span class="p">,</span>
+            <span class="c1"># &#39;B: BARS&#39;,</span>
+            <span class="c1"># &#39;M: MOVING AVGS&#39;,</span>
+            <span class="s1">&#39;R: RESET&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;Q: QUIT&#39;</span>
+        <span class="p">]</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;    &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">part</span> <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">parts</span> <span class="k">if</span> <span class="n">part</span><span class="p">])]</span>
+
+        <span class="n">lines</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">add_line</span><span class="p">(</span><span class="n">lines</span><span class="o">=</span><span class="n">lines</span><span class="p">,</span> <span class="n">parts</span><span class="o">=</span><span class="n">parts</span><span class="p">,</span> <span class="n">terminal</span><span class="o">=</span><span class="n">terminal</span><span class="p">,</span>
+                              <span class="n">position</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">),</span> <span class="n">separator_position</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                              <span class="n">underline</span><span class="o">=</span><span class="n">underline</span><span class="p">,</span> <span class="n">bold</span><span class="o">=</span><span class="n">bold</span><span class="p">)</span>
+
+        <span class="c1"># F-buttons: column controls</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">resource_and_color</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;PID&#39;</span><span class="p">,</span> <span class="n">terminal</span><span class="o">.</span><span class="n">on_magenta</span><span class="p">),</span>
+            <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;PPID&#39;</span><span class="p">,</span> <span class="n">terminal</span><span class="o">.</span><span class="n">on_magenta</span><span class="p">),</span>
+            <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s1">&#39;CPU&#39;</span><span class="p">,</span> <span class="n">terminal</span><span class="o">.</span><span class="n">on_cyan</span><span class="p">),</span>
+            <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="s1">&#39;RSS&#39;</span><span class="p">,</span> <span class="n">terminal</span><span class="o">.</span><span class="n">on_cyan</span><span class="p">),</span>
+            <span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="s1">&#39;DEVICE&#39;</span><span class="p">,</span> <span class="n">terminal</span><span class="o">.</span><span class="n">on_blue</span><span class="p">),</span>
+            <span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="s1">&#39;MEMORY&#39;</span><span class="p">,</span> <span class="n">terminal</span><span class="o">.</span><span class="n">on_yellow</span><span class="p">),</span>
+            <span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="s1">&#39;UTIL&#39;</span><span class="p">,</span> <span class="n">terminal</span><span class="o">.</span><span class="n">on_green</span><span class="p">),</span>
+            <span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="s1">&#39;TEMP&#39;</span><span class="p">,</span> <span class="n">terminal</span><span class="o">.</span><span class="n">on_red</span><span class="p">),</span>
+        <span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">f</span><span class="p">,</span> <span class="n">name_</span><span class="p">,</span> <span class="n">color</span> <span class="ow">in</span> <span class="n">resource_and_color</span><span class="p">:</span>
+            <span class="n">parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">terminal</span><span class="o">.</span><span class="n">bold</span><span class="si">}{</span><span class="n">color</span><span class="si">}</span><span class="s1">F</span><span class="si">{</span><span class="n">f</span><span class="si">}</span><span class="s1">: </span><span class="si">{</span><span class="n">name_</span><span class="si">}{</span><span class="n">terminal</span><span class="o">.</span><span class="n">normal</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;  &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">parts</span><span class="p">)]</span>
+
+
+        <span class="n">lines</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">add_line</span><span class="p">(</span><span class="n">lines</span><span class="o">=</span><span class="n">lines</span><span class="p">,</span> <span class="n">parts</span><span class="o">=</span><span class="n">parts</span><span class="p">,</span> <span class="n">terminal</span><span class="o">=</span><span class="n">terminal</span><span class="p">,</span>
+                              <span class="n">position</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">),</span> <span class="n">separator_position</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                              <span class="n">underline</span><span class="o">=</span><span class="n">underline</span><span class="p">,</span> <span class="n">bold</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">lines</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Analysis Center.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
