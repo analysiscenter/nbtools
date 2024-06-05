@@ -121,13 +121,15 @@ def notebook_to_script(path_script, path_notebook=None, ignore_markdown=True, re
 
 
 def get_available_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False, raise_error=False):
-    """ Select `n` gpus from available and free devices.
+    """ Select ``n`` gpus from available and free devices.
 
     Parameters
     ----------
     n : int, str
-        If `max`, then use maximum number of available devices.
-        If int, then number of devices to select.
+
+        * If ``'max'``, then use maximum number of available devices.
+        * If ``int``, then number of devices to select.
+
     min_free_memory : float
         Minimum percentage of free memory on a device to consider it free.
     max_processes : int
@@ -198,22 +200,26 @@ def get_gpu_free_memory(index):
     return info.free / info.total
 
 def set_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False, raise_error=False):
-    """ Set the `CUDA_VISIBLE_DEVICES` variable to `n` available devices.
+    """ Set the ``CUDA_VISIBLE_DEVICES`` variable to ``n`` available devices.
 
     Parameters
     ----------
     n : int, str
-        If `max`, then use maximum number of available devices.
-        If int, then number of devices to select.
+
+        * If ``'max'``, then use maximum number of available devices.
+        * If ``int``, then number of devices to select.
+
     min_free_memory : float
         Minimum percentage of free memory on a device to consider it free.
     max_processes : int
         Maximum amount of computed processes on a device to consider it free.
     verbose : bool or int
         Whether to show individual device information.
-        If 0 or False, then no information is displayed.
-        If 1 or True, then display the value assigned to `CUDA_VISIBLE_DEVICES` variable.
-        If 2, then display memory and process information for each device.
+
+            * If ``0`` or ``False``, then no information is displayed.
+            * If ``1`` or ``True``, then display the value assigned to ``CUDA_VISIBLE_DEVICES`` variable.
+            * If ``2``, then display memory and process information for each device.
+
     raise_error : bool
         Whether to raise an exception if not enough devices are available.
 
@@ -244,8 +250,7 @@ def free_gpus(devices=None):
     Parameters
     ----------
     devices : iterable of ints
-        Device indices to terminate processes.
-        If None, than free all available gpus.
+        Device indices to terminate processes. If ``None``, than free all available gpus.
     """
     import nvidia_smi
     import psutil
