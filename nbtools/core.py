@@ -1,6 +1,7 @@
 """ Core utility functions to work with Jupyter Notebooks. """
 #pylint: disable=import-outside-toplevel
 import os
+import sys
 import re
 import json
 import warnings
@@ -200,14 +201,17 @@ def get_available_gpus(n=1, min_free_memory=0.9, max_processes=None, verbose=Fal
             raise ValueError(msg)
         warnings.warn(msg, RuntimeWarning)
 
+    sorted_indices = sorted(range(len(memory_free)), key=lambda k: memory_free[k], reverse=True)
     if return_memory:
         gpus = {}
-        for ix, gpu in enumerate(np.array(available_devices)[:n]):
+        for ix in sorted_indices[:n]:
+            gpu = available_devices[ix]
             gpus[gpu] = {'available': memory_free[ix], 'max': memory_total[ix]}
         return gpus
 
-    order = np.argsort(memory_free)[::-1]
-    return np.array(available_devices)[order][:n].tolist()
+    sorted_indices = sorted(range(len(memory_free)), key=lambda k: memory_free[k], reverse=True)
+    sorted_devices = [available_devices[i] for i in sorted_indices]
+    return sorted_devices[:n]
 
 def get_gpu_free_memory(index):
     """ Get free memory of a device. """
