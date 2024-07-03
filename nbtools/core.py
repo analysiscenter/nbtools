@@ -120,7 +120,9 @@ def notebook_to_script(path_script, path_notebook=None, ignore_markdown=True, re
 
 
 
-def get_available_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False, raise_error=False):
+
+def get_available_gpus(n=1, min_free_memory=0.9, max_processes=None, verbose=False,
+                       raise_error=False, return_memory=False):
     """ Select ``n`` gpus from available and free devices.
 
     Parameters
@@ -130,46 +132,64 @@ def get_available_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False,
         * If ``'max'``, then use maximum number of available devices.
         * If ``int``, then number of devices to select.
 
-    min_free_memory : float
-        Minimum percentage of free memory on a device to consider it free.
+    min_free_memory : int, float
+
+        * If ``int``, minimum amount of free memory (in MB) on a device to consider it free.
+        * If ``float``, minimum percentage of free memory.
+
     max_processes : int
         Maximum amount of computed processes on a device to consider it free.
     verbose : bool
         Whether to show individual device information.
     raise_error : bool
         Whether to raise an exception if not enough devices are available.
+    return_memory : bool
+        Whether to return memory available on each GPU.
 
     Returns
     -------
     available_devices : list
-        Indices of available GPUs.
+        List with available GPUs indices or dict of indices and ``'available'`` and ``'max'`` memory (in MB)
     """
     try:
         import nvidia_smi
     except ImportError as exception:
         raise ImportError('Install Python interface for nvidia_smi') from exception
 
-    nvidia_smi.nvmlInit()
+    try:
+        error_message = None
+        import pynvml
+        nvidia_smi.nvmlInit()
+    except pynvml.NVMLError_LibraryNotFound:
+        if sys.platform == 'win32':
+            error_message = " Copy nvml.dll from 'Windows/System32' to 'Program Files/NVIDIA Corporation/NVSMI'"
+    finally:
+        if error_message:
+            raise RuntimeError('NVIDIA SMI is not available.' + error_message)
     n_devices = nvidia_smi.nvmlDeviceGetCount()
 
-    available_devices, memory_usage = [], []
+    available_devices, memory_free, memory_total  = [], [], []
     for i in range(n_devices):
         handle = nvidia_smi.nvmlDeviceGetHandleByIndex(i)
         info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
 
-        fraction_free = info.free / info.total
         num_processes = len(nvidia_smi.nvmlDeviceGetComputeRunningProcesses(handle))
+        free_memory = info.free / 1024**2
+        total_memory = info.total / 1024**2
 
-        consider_available = (fraction_free > min_free_memory) & (num_processes <= max_processes)
+        consider_available = (
+            (free_memory >= min_free_memory) &
+            (max_processes is None or num_processes <= max_processes)
+        )
+
         if consider_available:
             available_devices.append(i)
-            memory_usage.append(fraction_free)
+            memory_free.append(free_memory)
+            memory_total.append(total_memory)
 
         if verbose:
-            print(f'Device {i} | Free memory: {fraction_free:4.2f} | '
+            print(f'Device {i} | Free memory: {info.free:4.2f} | '
                   f'Number of running processes: {num_processes:>2} | Free: {consider_available}')
-
-    nvidia_smi.nvmlShutdown()
 
     if isinstance(n, str) and n.startswith('max'):
         n = len(available_devices)
@@ -180,10 +200,14 @@ def get_available_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False,
             raise ValueError(msg)
         warnings.warn(msg, RuntimeWarning)
 
-    # Argsort of `memory_usage` in a descending order
-    indices = sorted(range(len(available_devices)), key=memory_usage.__getitem__, reverse=True)
-    available_devices = [available_devices[i] for i in indices]
-    return sorted(available_devices[:n])
+    if return_memory:
+        gpus = {}
+        for ix, gpu in enumerate(np.array(available_devices)[:n]):
+            gpus[gpu] = {'available': memory_free[ix], 'max': memory_total[ix]}
+        return gpus
+
+    order = np.argsort(memory_free)[::-1]
+    return np.array(available_devices)[order][:n].tolist()
 
 def get_gpu_free_memory(index):
     """ Get free memory of a device. """
@@ -209,8 +233,11 @@ def set_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False, raise_err
         * If ``'max'``, then use maximum number of available devices.
         * If ``int``, then number of devices to select.
 
-    min_free_memory : float
-        Minimum percentage of free memory on a device to consider it free.
+    min_free_memory : float or int
+
+        * If ``int``, minimum amount of free memory (in MB) on a device to consider it free.
+        * If ``float``, minimum percentage of free memory.
+
     max_processes : int
         Maximum amount of computed processes on a device to consider it free.
     verbose : bool or int
