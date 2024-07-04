@@ -240,7 +240,7 @@ def set_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False, raise_err
         * If ``'max'``, then use maximum number of available devices.
         * If ``int``, then number of devices to select.
 
-    min_free_memory : float or int
+    min_free_memory : int, float
 
         * If ``int``, minimum amount of free memory (in MB) on a device to consider it free.
         * If ``float``, minimum percentage of free memory.
