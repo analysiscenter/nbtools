@@ -122,7 +122,7 @@ def notebook_to_script(path_script, path_notebook=None, ignore_markdown=True, re
 
 
 
-def get_available_gpus(n=1, min_free_memory=0.9, max_processes=None, verbose=False,
+def get_available_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False,
                        raise_error=False, return_memory=False):
     """ Select ``n`` gpus from available and free devices.
 
@@ -170,6 +170,7 @@ def get_available_gpus(n=1, min_free_memory=0.9, max_processes=None, verbose=Fal
     n_devices = nvidia_smi.nvmlDeviceGetCount()
 
     available_devices, memory_free, memory_total  = [], [], []
+
     for i in range(n_devices):
         handle = nvidia_smi.nvmlDeviceGetHandleByIndex(i)
         info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
@@ -178,8 +179,10 @@ def get_available_gpus(n=1, min_free_memory=0.9, max_processes=None, verbose=Fal
         free_memory = info.free / 1024**2
         total_memory = info.total / 1024**2
 
+        memory_threshold = total_memory * min_free_memory if isinstance(min_free_memory, float) else min_free_memory
+
         consider_available = (
-            (free_memory >= min_free_memory) &
+            (free_memory >= memory_threshold) &
             (max_processes is None or num_processes <= max_processes)
         )
 
