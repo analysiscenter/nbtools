@@ -37,7 +37,7 @@ setup(
             'nbconvert>=5.6.1',
         ],
         'nbwatch': [
-            'requests>=2.30'
+            'requests>=2.24'
         ]
     },
     classifiers=[
