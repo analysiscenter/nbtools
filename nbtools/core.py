@@ -153,29 +153,28 @@ def get_available_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False,
         List with available GPUs indices or dict of indices and ``'available'`` and ``'max'`` memory (in MB)
     """
     try:
-        import nvidia_smi
+        import pynvml
     except ImportError as exception:
         raise ImportError('Install Python interface for nvidia_smi') from exception
 
     try:
         error_message = None
-        import pynvml
-        nvidia_smi.nvmlInit()
+        pynvml.nvmlInit()
     except pynvml.NVMLError_LibraryNotFound:
         if sys.platform == 'win32':
             error_message = " Copy nvml.dll from 'Windows/System32' to 'Program Files/NVIDIA Corporation/NVSMI'"
     finally:
         if error_message:
             raise RuntimeError('NVIDIA SMI is not available.' + error_message)
-    n_devices = nvidia_smi.nvmlDeviceGetCount()
+    n_devices = pynvml.nvmlDeviceGetCount()
 
     available_devices, memory_free, memory_total  = [], [], []
 
     for i in range(n_devices):
-        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(i)
-        info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+        handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+        info = pynvml.nvmlDeviceGetMemoryInfo(handle)
 
-        num_processes = len(nvidia_smi.nvmlDeviceGetComputeRunningProcesses(handle))
+        num_processes = len(pynvml.nvmlDeviceGetComputeRunningProcesses(handle))
         free_memory = info.free / 1024**2
         total_memory = info.total / 1024**2
 
@@ -219,15 +218,15 @@ def get_available_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False,
 def get_gpu_free_memory(index):
     """ Get free memory of a device. """
     try:
-        import nvidia_smi
+        import pynvml
     except ImportError as exception:
         raise ImportError('Install Python interface for nvidia_smi') from exception
 
-    nvidia_smi.nvmlInit()
-    nvidia_smi.nvmlDeviceGetCount()
-    handle = nvidia_smi.nvmlDeviceGetHandleByIndex(index)
-    info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
-    nvidia_smi.nvmlShutdown()
+    pynvml.nvmlInit()
+    pynvml.nvmlDeviceGetCount()
+    handle = pynvml.nvmlDeviceGetHandleByIndex(index)
+    info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+    pynvml.nvmlShutdown()
     return info.free / info.total
 
 def set_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False, raise_error=False):
@@ -286,16 +285,16 @@ def free_gpus(devices=None):
     devices : iterable of ints
         Device indices to terminate processes. If ``None``, than free all available gpus.
     """
-    import nvidia_smi
+    import pynvml
     import psutil
 
-    nvidia_smi.nvmlInit()
+    pynvml.nvmlInit()
 
     if devices is None:
         if 'CUDA_VISIBLE_DEVICES' in os.environ.keys():
             devices = [int(d) for d in os.environ["CUDA_VISIBLE_DEVICES"].split(',')]
         else:
-            devices = range(0, nvidia_smi.nvmlDeviceGetCount())
+            devices = range(0, pynvml.nvmlDeviceGetCount())
 
     for device_index in devices:
         handle = nvidia_smi.nvmlDeviceGetHandleByIndex(device_index)
@@ -303,4 +302,4 @@ def free_gpus(devices=None):
         for proc in nvidia_smi.nvmlDeviceGetComputeRunningProcesses(handle):
             psutil.Process(proc.pid).terminate()
 
-    nvidia_smi.nvmlShutdown()
+    pynvml.nvmlShutdown()
