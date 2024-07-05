@@ -297,9 +297,9 @@ def free_gpus(devices=None):
             devices = range(0, pynvml.nvmlDeviceGetCount())
 
     for device_index in devices:
-        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(device_index)
+        handle = pynvml.nvmlDeviceGetHandleByIndex(device_index)
 
-        for proc in nvidia_smi.nvmlDeviceGetComputeRunningProcesses(handle):
+        for proc in pynvml.nvmlDeviceGetComputeRunningProcesses(handle):
             psutil.Process(proc.pid).terminate()
 
     pynvml.nvmlShutdown()
