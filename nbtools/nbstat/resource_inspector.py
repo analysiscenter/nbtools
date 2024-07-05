@@ -10,7 +10,7 @@ import psutil
 import requests
 from blessed import Terminal
 
-import nvidia_smi
+import pynvml
 
 from .resource import Resource
 from .resource_table import ResourceTable
@@ -32,7 +32,7 @@ class ResourceInspector:
     # TODO: correct working with VSCode Jupyter Notebooks
     # TODO: make sure that everything works without sudo
     # TODO: add more fallbacks for unavailable resources
-    # TODO: can add explicit __delete__ to call nvidia_smi.nvmlShutdown(), if we ever have problems with that
+    # TODO: can add explicit __delete__ to call pynvml.nvmlShutdown(), if we ever have problems with that
     def __init__(self, formatter=None):
         self.formatter = formatter
 
@@ -47,10 +47,10 @@ class ResourceInspector:
     def device_handles(self):
         """ Cached handles of NVIDIA devices. """
         if self._device_handles is None:
-            nvidia_smi.nvmlInit()
-            n_devices = nvidia_smi.nvmlDeviceGetCount()
+            pynvml.nvmlInit()
+            n_devices = pynvml.nvmlDeviceGetCount()
 
-            self._device_handles = {device_id : nvidia_smi.nvmlDeviceGetHandleByIndex(device_id)
+            self._device_handles = {device_id : pynvml.nvmlDeviceGetHandleByIndex(device_id)
                                     for device_id in range(n_devices)}
         return self._device_handles
 
@@ -82,7 +82,7 @@ class ResourceInspector:
         device_table, device_process_table = ResourceTable(), ResourceTable()
 
         for device_id, handle in self.device_handles.items():
-            device_name = nvidia_smi.nvmlDeviceGetName(handle)
+            device_name = pynvml.nvmlDeviceGetName(handle)
             device_name = device_name.decode() if isinstance(device_name, bytes) else device_name
             common_info = {Resource.DEVICE_ID : device_id,
                            Resource.DEVICE_NAME : device_name}
@@ -90,7 +90,7 @@ class ResourceInspector:
             # Inseparable device information like memory, temperature, power, etc. Request it only if needed
             if (formatter.get(Resource.DEVICE_UTIL, False) or
                 formatter.get(Resource.DEVICE_UTIL_MA, False)):
-                utilization = nvidia_smi.nvmlDeviceGetUtilizationRates(handle)
+                utilization = pynvml.nvmlDeviceGetUtilizationRates(handle)
                 common_info[Resource.DEVICE_UTIL] = utilization.gpu
                 common_info[Resource.DEVICE_MEMORY_UTIL] = utilization.memory
 
@@ -100,29 +100,29 @@ class ResourceInspector:
                 common_info[Resource.DEVICE_UTIL_MA] = lst.get_average(size=window)
 
             if formatter.get(Resource.DEVICE_TEMP, False):
-                temperature = nvidia_smi.nvmlDeviceGetTemperature(handle, nvidia_smi.NVML_TEMPERATURE_GPU)
+                temperature = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
                 common_info[Resource.DEVICE_TEMP] = temperature
 
             if formatter.get(Resource.DEVICE_FAN, False):
-                fan_speed = nvidia_smi.nvmlDeviceGetFanSpeed(handle)
+                fan_speed = pynvml.nvmlDeviceGetFanSpeed(handle)
                 common_info[Resource.DEVICE_FAN] = fan_speed
 
             if formatter.get(Resource.DEVICE_POWER_USED, False):
-                power_used = nvidia_smi.nvmlDeviceGetPowerUsage(handle)
-                power_total = nvidia_smi.nvmlDeviceGetEnforcedPowerLimit(handle)
+                power_used = pynvml.nvmlDeviceGetPowerUsage(handle)
+                power_total = pynvml.nvmlDeviceGetEnforcedPowerLimit(handle)
 
                 common_info[Resource.DEVICE_POWER_USED] = power_used
                 common_info[Resource.DEVICE_POWER_TOTAL] = power_total
 
             if (formatter.get(Resource.DEVICE_MEMORY_USED, False) or
                 formatter.get(Resource.DEVICE_PROCESS_MEMORY_USED, False)):
-                memory = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+                memory = pynvml.nvmlDeviceGetMemoryInfo(handle)
                 common_info[Resource.DEVICE_MEMORY_USED] = memory.used
                 common_info[Resource.DEVICE_MEMORY_TOTAL] = memory.total
 
             # Collect individual processes info, if needed. Save it to both tables: in one as list, in other separately
             device_info = {**common_info}
-            processes = nvidia_smi.nvmlDeviceGetComputeRunningProcesses(handle)
+            processes = pynvml.nvmlDeviceGetComputeRunningProcesses(handle)
             device_info.update({Resource.DEVICE_PROCESS_N : 0,
                                 Resource.DEVICE_PROCESS_PID : [],
                                 Resource.DEVICE_PROCESS_MEMORY_USED : []})
