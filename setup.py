@@ -30,15 +30,13 @@ setup(
         'pynvml>=11.5.0',
         'blessed>=1.17',
         'psutil>=5.6',
+        'requests>=2.24',
     ],
     extras_require={
         'nbrun': [
             'ipython>=7.10.0',
             'nbconvert>=5.6.1',
         ],
-        'nbwatch': [
-            'requests>=2.24'
-        ]
     },
     classifiers=[
         'Development Status :: 4 - Beta',
