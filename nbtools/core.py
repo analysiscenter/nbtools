@@ -215,8 +215,8 @@ def get_available_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False,
     sorted_devices = [available_devices[i] for i in sorted_indices]
     return sorted_devices[:n]
 
-def get_gpu_free_memory(index):
-    """ Get free memory of a device. """
+def get_gpu_free_memory(index, ratio=True):
+    """ Get free memory of a device (ratio or size in MB). """
     try:
         import pynvml
     except ImportError as exception:
@@ -227,7 +227,13 @@ def get_gpu_free_memory(index):
     handle = pynvml.nvmlDeviceGetHandleByIndex(index)
     info = pynvml.nvmlDeviceGetMemoryInfo(handle)
     pynvml.nvmlShutdown()
-    return info.free / info.total
+
+    free_memory = info.free / 1024**2
+    total_memory = info.total / 1024**2
+
+    if ratio:
+        return free_memory / total_memory
+    return free_memory
 
 def set_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False, raise_error=False):
     """ Set the ``CUDA_VISIBLE_DEVICES`` variable to ``n`` available devices.
