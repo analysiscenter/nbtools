@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NBstat: resourse monitoring &mdash; nbtools  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Jupyter Notebooks: linting and execution" href="nbtools.library.html" />
+    <link rel="prev" title="Getting Started" href="nbtools.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html">
+            
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="nbtools.html">Getting Started</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">NBstat: resourse monitoring</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#views">Views</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#options">Options</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#main-options">Main options</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#column-options">Column options</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#table-options">Table options</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#other-options">Other options</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#keystrokes">Keystrokes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#sort">Sort</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#usage-examples">Usage examples</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#using-as-a-python-library">Using as a Python library</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#troubleshooting-pid-namespaces-user-permissions-and-zombie-processes">Troubleshooting: PID namespaces, user permissions and zombie processes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#contribute">Contribute</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nbtools.library.html">Jupyter Notebooks: linting and execution</a></li>
+</ul>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/modules.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">nbtools</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="nbtools.html">Getting Started</a></li>
+      <li class="breadcrumb-item active">NBstat: resourse monitoring</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/user_guide/nbtools.nbstat.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="nbstat-resourse-monitoring">
+<h1>NBstat: resourse monitoring<a class="headerlink" href="#nbstat-resourse-monitoring" title="Link to this heading"></a></h1>
+<p>This documentation explains all of the <strong>nbstat</strong> options and shows examples of its advanced usage. It can be also accessed via <code class="docutils literal notranslate"><span class="pre">nbstat</span> <span class="pre">--help</span></code>.</p>
+<section id="views">
+<h2>Views<a class="headerlink" href="#views" title="Link to this heading"></a></h2>
+<p>The <strong>nbstat</strong> table information is, roughly: <em>for each Jupyter Notebook show all of its processes with system/device utilization information.</em></p>
+<p>Along with the <strong>nbstat</strong>, we provide following commands:</p>
+<ul class="simple">
+<li><p><strong>devicestat</strong> — a transposed view of the same data: <em>for each NVIDIA device show all Jupyter Notebooks using it, along with other resources utilization.</em></p></li>
+<li><p><strong>nbwatch</strong> — continuously update information from the <strong>nbstat</strong> table in a full-screen terminal. Equivalent to <code class="docutils literal notranslate"><span class="pre">nbstat</span> <span class="pre">--watch</span></code>.</p></li>
+<li><p><strong>devicewatch</strong> — continuously update information from the <strong>devicestat</strong> table in a full-screen terminal. Equivalent to <code class="docutils literal notranslate"><span class="pre">devicestat</span> <span class="pre">--watch</span></code>.</p></li>
+</ul>
+<p>The first column of each table (Notebook name for <strong>nbstat</strong> or device ID for <strong>devicestat</strong>) is referred in this documentation as <em>index</em>: we apply additional filtering/sorting based on it.</p>
+</section>
+<section id="options">
+<h2>Options<a class="headerlink" href="#options" title="Link to this heading"></a></h2>
+<p>Options are separated into four sections:</p>
+<ul class="simple">
+<li><p>Main options to filter the table and control how many processes are shown.</p></li>
+<li><p>Column options to control displayed information for each process.</p></li>
+<li><p>Table options to configure the formatting.</p></li>
+<li><p>Other options.</p></li>
+</ul>
+<section id="main-options">
+<h3>Main options<a class="headerlink" href="#main-options" title="Link to this heading"></a></h3>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">positional</span> <span class="pre">argument</span></code> — allows to filter the index (the first column) based on regular expression.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>For example, <code class="docutils literal notranslate"><span class="pre">nbstat</span> <span class="pre">.*_experiment_.*.ipynb</span></code> would show only files with <code class="docutils literal notranslate"><span class="pre">ipynb</span></code> extension and <code class="docutils literal notranslate"><span class="pre">_experiment_</span></code> suffix in the name.</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-v</span></code>, <code class="docutils literal notranslate"><span class="pre">-V</span></code> — sets the verbosity level.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Default level is 0, which shows only notebooks that use at least one NVIDIA device and only processes that use devices.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-v</span></code> — verbosity level 1. Shows all processes for notebooks that use at least one NVIDIA device.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-V</span></code> — verbosity level 2. Shows all processes for all notebooks.</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</section>
+<section id="column-options">
+<h3>Column options<a class="headerlink" href="#column-options" title="Link to this heading"></a></h3>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">--show</span> <span class="pre">a</span> <span class="pre">b</span> <span class="pre">c</span></code>, <code class="docutils literal notranslate"><span class="pre">--hide</span> <span class="pre">x</span> <span class="pre">y</span> <span class="pre">z</span></code> — show or hide columns in the table.</p>
+<blockquote>
+<div><ul>
+<li><p>Column are added in pre-defined places.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">hide</span></code> has priority over <code class="docutils literal notranslate"><span class="pre">show</span></code>.</p></li>
+<li><p>Adding too much columns will screw up the table formatting: especially true for very wide (<code class="docutils literal notranslate"><span class="pre">path</span></code>, <code class="docutils literal notranslate"><span class="pre">kernel_id</span></code>) columns.</p></li>
+<li><p>Possible values depend on the exact table view (<strong>nbstat</strong> or <strong>devicestat</strong>): the actual list is available on the <code class="docutils literal notranslate"><span class="pre">--help</span></code> page.</p></li>
+<li><p>In most cases, following names are recognized:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>process properties — <code class="docutils literal notranslate"><span class="pre">process_name</span></code>, <code class="docutils literal notranslate"><span class="pre">type</span></code>, <code class="docutils literal notranslate"><span class="pre">path</span></code>, <code class="docutils literal notranslate"><span class="pre">pid</span></code>, <code class="docutils literal notranslate"><span class="pre">ppid</span></code>, <code class="docutils literal notranslate"><span class="pre">ngid</span></code>, <code class="docutils literal notranslate"><span class="pre">kernel_id</span></code>.</p></li>
+<li><p>system resource usage — <code class="docutils literal notranslate"><span class="pre">cpu</span></code>, <code class="docutils literal notranslate"><span class="pre">rss</span></code>, <code class="docutils literal notranslate"><span class="pre">status</span></code>, <code class="docutils literal notranslate"><span class="pre">create_time</span></code>.</p></li>
+<li><p>device resource usage — <code class="docutils literal notranslate"><span class="pre">short_id</span></code>, <code class="docutils literal notranslate"><span class="pre">process_memory</span></code>, <code class="docutils literal notranslate"><span class="pre">temperature</span></code>, <code class="docutils literal notranslate"><span class="pre">util</span></code>, <code class="docutils literal notranslate"><span class="pre">power</span></code>, <code class="docutils literal notranslate"><span class="pre">fan</span></code>.</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--show-all</span></code> — display all available columns.</p></li>
+</ul>
+</section>
+<section id="table-options">
+<h3>Table options<a class="headerlink" href="#table-options" title="Link to this heading"></a></h3>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">--show-similar</span></code> — by default, parts of the rows are hidden if the value is the same as in the previous row. Use this parameter to change this behavior.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--hide-supheader</span></code> — by default, we show current time, driver and CUDA versions. Use this parameter to change this behavior.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--hide-header</span></code> — by default, we show a row with column names in the table. Use this parameter to change this behavior.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--show-footnote</span></code>, <code class="docutils literal notranslate"><span class="pre">--hide-footnote</span></code> — show a row with total system resource usage.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>By default, it is enabled if the table is refreshed continuously (<code class="docutils literal notranslate"><span class="pre">--watch</span></code>) and disabled otherwise.</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--show-separators</span></code>, <code class="docutils literal notranslate"><span class="pre">--hide-separators</span></code> — turn on/off all the table separators (lines between rows/columns).</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>By default, separators are enabled for <strong>nbstat</strong> and disabled for <strong>devicestat</strong>.</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--suppress-color</span></code> — disable using colors in the displayed view.</p></li>
+</ul>
+</section>
+<section id="other-options">
+<h3>Other options<a class="headerlink" href="#other-options" title="Link to this heading"></a></h3>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">-i</span></code>, <code class="docutils literal notranslate"><span class="pre">-n</span></code>, <code class="docutils literal notranslate"><span class="pre">--interval</span></code>, <code class="docutils literal notranslate"><span class="pre">--watch</span></code> — continuously update information from the table in a full-screen terminal.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>If provided, a number sets the interval between ticks: <code class="docutils literal notranslate"><span class="pre">nbstat</span> <span class="pre">-i</span> <span class="pre">0.2</span></code>.</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-w</span></code>, <code class="docutils literal notranslate"><span class="pre">--window</span></code> — number of table updates to use for computing moving averages.</p></li>
+</ul>
+</section>
+</section>
+<section id="keystrokes">
+<h2>Keystrokes<a class="headerlink" href="#keystrokes" title="Link to this heading"></a></h2>
+<p>While in the <code class="docutils literal notranslate"><span class="pre">watch</span></code> mode, you can use keystrokes to change the displayed view:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">tab</span></code> — swaps views, from <code class="docutils literal notranslate"><span class="pre">nbwatch</span></code> to <code class="docutils literal notranslate"><span class="pre">devicewatch</span></code> and back.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">v</span></code> — changes verbosity of the displayed table.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">b</span></code> — toggles bar representation for some of the resources: in addition to its value, show colored bar.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">m</span></code> — toggles moving average column for some of the resources: values are averaged across the latest iterations.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">s</span></code> — toggles table separators.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">F1-F8</span></code> — toggles columns with resources.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">r</span></code> — resets the behaviour to the defaults.</p></li>
+</ul>
+</section>
+<section id="sort">
+<h2>Sort<a class="headerlink" href="#sort" title="Link to this heading"></a></h2>
+<p>The <strong>nbstat</strong> table is sorted in the following way:</p>
+<blockquote>
+<div><ul>
+<li><p>index items are sorted based on overall device usage and main process start time:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>entries that use at least one NVIDIA device, sorted by starting time</p></li>
+<li><p>entries that do not use NVIDIA devices, sorted by starting time. Note that those notebooks are shown only with verbosity level 2.</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>processes for each index item are shown in the following order:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>the main process</p></li>
+<li><p>processes that use at least one device, sorted by starting time</p></li>
+<li><p>processes that do not use NVIDIA devices, sorted by starting time. Note that those processes are shown only with verbosity level &gt;=1.</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
+</section>
+<section id="usage-examples">
+<h2>Usage examples<a class="headerlink" href="#usage-examples" title="Link to this heading"></a></h2>
+<p>Using plain <strong>nbwatch</strong> is enough to monitor your usual ML applications. In some situations, though, following snippets are helpful:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">nbstat</span> <span class="pre">.*.ipynb</span></code> — to show only Jupyter Notebooks.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">nbstat</span> <span class="pre">.*/research/.*.ipynb</span></code> — to show only Jupyter Notebooks in a specific directory.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">nbstat</span> <span class="pre">--show</span> <span class="pre">status</span> <span class="pre">cpu</span> <span class="pre">-i</span> <span class="pre">0.1</span></code> — additionally displays process status and CPU usage at an increased frequency.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">nbstat</span> <span class="pre">--hide</span> <span class="pre">type</span> <span class="pre">pid</span> <span class="pre">rss</span></code> — display only the GPU-related columns for each process.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">nbstat</span> <span class="pre">-v</span></code>, <code class="docutils literal notranslate"><span class="pre">nbstat</span> <span class="pre">-V</span></code> is immensely helpful for <code class="docutils literal notranslate"><span class="pre">multiprocessing</span></code>-related debugging.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Adding <code class="docutils literal notranslate"><span class="pre">--show</span> <span class="pre">pid</span> <span class="pre">ppid</span></code> can be nice to navigate through large number of processes.</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">nbstat</span> <span class="pre">--device-memory-format</span> <span class="pre">GB</span></code> — show GPU memory in GB: an increasingly more used option when using larger devices.</p></li>
+</ul>
+</section>
+<section id="using-as-a-python-library">
+<h2>Using as a Python library<a class="headerlink" href="#using-as-a-python-library" title="Link to this heading"></a></h2>
+<p>Sometimes, it is desired to get <strong>nbstat</strong> / <strong>devicestat</strong> information as a Python object to parse it manually. You can learn how to do it in the [tutorial](../../tutorials/NBstat.ipynb).</p>
+</section>
+<section id="troubleshooting-pid-namespaces-user-permissions-and-zombie-processes">
+<h2>Troubleshooting: PID namespaces, user permissions and zombie processes<a class="headerlink" href="#troubleshooting-pid-namespaces-user-permissions-and-zombie-processes" title="Link to this heading"></a></h2>
+<p>A <a class="reference external" href="https://github.com/NVIDIA/nvidia-docker/issues/179">known problem</a> of NVIDIA drivers is that <strong>nvidia-smi</strong> reports PIDs of processes on devices in the global namespace, not in the container namespace, which does not allow to match PIDs of container processes to their device PIDs. There are a few workarounds:</p>
+<ul class="simple">
+<li><p>[<strong>recommended</strong>] pass <code class="docutils literal notranslate"><span class="pre">--pid=host</span></code> flag to <code class="docutils literal notranslate"><span class="pre">docker</span> <span class="pre">run</span></code>.</p></li>
+<li><p>patch NVIDIA driver to handle PID namespaces correctly.</p></li>
+<li><p>[Linux only] fallback on manually inspecting <code class="docutils literal notranslate"><span class="pre">*/proc/PID/*</span></code> files to identify the host PID for each process inside of the container.</p></li>
+</ul>
+<p>While <code class="docutils literal notranslate"><span class="pre">nbstat</span></code> provides several fallbacks for <cite>Linux</cite> containers (and intend to provide support for more environments over time), the bullet-proof way is to use <code class="docutils literal notranslate"><span class="pre">--pid=host</span></code> option for <code class="docutils literal notranslate"><span class="pre">docker</span> <span class="pre">run</span></code>. Adding it resolves most of the issues immediately.</p>
+<p>One more thing that sometimes happens to NVIDIA devices is zombie processes: by incorrectly terminating a GPU-using process you can end up in a situation where device memory is held by not-existing process. As far as I know, there are no ways of killing them without rebooting, and <code class="docutils literal notranslate"><span class="pre">nbstat</span></code> just marks such processes with red color.</p>
+<p>In order to inspect certain properties of processes, we rely on having all necessary permissions already provided at command run. <code class="docutils literal notranslate"><span class="pre">nbstat</span></code> has some fallbacks for some attributes, and I currently work on improving error handling in cases of denied access to files.</p>
+</section>
+<section id="contribute">
+<h2>Contribute<a class="headerlink" href="#contribute" title="Link to this heading"></a></h2>
+<p>If you are interested to contribute, check out the <a class="reference external" href="https://github.com/analysiscenter/nbtools/blob/master/nbtools/nbstat/DEV.md">developer/contributor page</a>. It contains detailed description about inner workings of the library, my design choices and motivation behind them, as well as discussion of complexities along the way.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="nbtools.html" class="btn btn-neutral float-left" title="Getting Started" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="nbtools.library.html" class="btn btn-neutral float-right" title="Jupyter Notebooks: linting and execution" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Analysis Center.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>nbtools.exec_notebook &mdash; nbtools  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html">
+            
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/nbtools.html">Getting Started</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/modules.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">nbtools</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">nbtools.exec_notebook</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for nbtools.exec_notebook</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot; Functions for running Jupyter Notebooks programmatically.&quot;&quot;&quot;</span>
+<span class="c1">#pylint: disable=import-outside-toplevel</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">wraps</span>
+<span class="kn">from</span> <span class="nn">glob</span> <span class="kn">import</span> <span class="n">glob</span>
+<span class="kn">from</span> <span class="nn">textwrap</span> <span class="kn">import</span> <span class="n">dedent</span>
+<span class="kn">from</span> <span class="nn">multiprocessing</span> <span class="kn">import</span> <span class="n">Process</span><span class="p">,</span> <span class="n">Queue</span>
+<span class="kn">import</span> <span class="nn">psutil</span>
+
+
+<span class="n">TMP_DIR</span> <span class="o">=</span> <span class="s1">&#39;/tmp/nbtools_exec_notebook&#39;</span>
+<span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">TMP_DIR</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+
+<span class="c1"># Decorator</span>
+<div class="viewcode-block" id="run_in_process">
+<a class="viewcode-back" href="../../api/nbtools.html#nbtools.exec_notebook.run_in_process">[docs]</a>
+<span class="k">def</span> <span class="nf">run_in_process</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Decorator to run the ``func`` in a separate process for terminating all related processes properly. &quot;&quot;&quot;</span>
+    <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="c1"># pylint: disable=broad-exception-caught, broad-exception-raised</span>
+        <span class="n">_output_queue</span> <span class="o">=</span> <span class="n">Queue</span><span class="p">()</span>
+        <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">kwargs</span><span class="p">,</span> <span class="s1">&#39;_output_queue&#39;</span><span class="p">:</span> <span class="n">_output_queue</span><span class="p">}</span>
+
+        <span class="n">json_path</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="n">output</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;failed&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;traceback&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">}</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">process</span> <span class="o">=</span> <span class="n">Process</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">func</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="o">=</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="n">process</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+            <span class="n">path</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">args</span> <span class="k">else</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;path&#39;</span><span class="p">]</span>
+            <span class="n">json_path</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">TMP_DIR</span><span class="si">}</span><span class="s1">/</span><span class="si">{</span><span class="n">process</span><span class="o">.</span><span class="n">pid</span><span class="si">}</span><span class="s1">.json&#39;</span>
+
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">json_path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+                <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">({</span><span class="s1">&#39;path&#39;</span><span class="p">:</span> <span class="n">path</span><span class="p">},</span> <span class="n">file</span><span class="p">)</span>
+
+            <span class="n">output</span> <span class="o">=</span> <span class="n">_output_queue</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+            <span class="n">process</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">KeyboardInterrupt</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;failed&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;traceback&#39;</span><span class="p">:</span> <span class="n">e</span><span class="p">}</span>
+
+            <span class="c1"># Terminate all relevant processes when something went wrong, e.g. Keyboard Interrupt</span>
+            <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">psutil</span><span class="o">.</span><span class="n">Process</span><span class="p">(</span><span class="n">process</span><span class="o">.</span><span class="n">pid</span><span class="p">)</span><span class="o">.</span><span class="n">children</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">psutil</span><span class="o">.</span><span class="n">pid_exists</span><span class="p">(</span><span class="n">child</span><span class="o">.</span><span class="n">pid</span><span class="p">):</span>
+                    <span class="n">child</span><span class="o">.</span><span class="n">terminate</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="n">psutil</span><span class="o">.</span><span class="n">pid_exists</span><span class="p">(</span><span class="n">process</span><span class="o">.</span><span class="n">pid</span><span class="p">):</span>
+                <span class="n">process</span><span class="o">.</span><span class="n">terminate</span><span class="p">()</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">json_path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">json_path</span><span class="p">):</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">json_path</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;raise_exception&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="ow">and</span> <span class="n">output</span><span class="p">[</span><span class="s1">&#39;failed&#39;</span><span class="p">]:</span>
+                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="s1">&#39;traceback&#39;</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">output</span>
+    <span class="k">return</span> <span class="n">_wrapper</span></div>
+
+
+<span class="k">def</span> <span class="nf">get_exec_notebook_name</span><span class="p">(</span><span class="n">pid</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Get the notebook name by its pid.</span>
+
+<span class="sd">    Under the hood, the function checks the /tmp/ directory for logs of running ``exec_notebook`` executors and extract</span>
+<span class="sd">    the name for the provided pid.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">json_path</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">TMP_DIR</span><span class="si">}</span><span class="s1">/</span><span class="si">{</span><span class="n">pid</span><span class="si">}</span><span class="s1">.json&#39;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">json_path</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s1">&#39;exec_notebook&#39;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">json_path</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">file</span><span class="p">)[</span><span class="s1">&#39;path&#39;</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+
+
+<span class="c1"># Code fragments that are inserted as additional cells in a notebook</span>
+<span class="n">CELL_INSERT_COMMENT</span> <span class="o">=</span> <span class="s2">&quot;# Cell inserted during automated execution&quot;</span>
+
+<span class="c1"># Connect to a shelve database for inputs/outputs providing</span>
+<span class="n">DB_CONNECT_CODE_CELL</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    import os, shelve</span>
+<span class="s2">    from dill import Pickler, Unpickler</span>
+
+<span class="s2">    shelve.Pickler = Pickler</span>
+<span class="s2">    shelve.Unpickler = Unpickler</span>
+
+<span class="s2">    out_path_db = </span><span class="si">{}</span>
+<span class="s2">&quot;&quot;&quot;</span>
+<span class="n">DB_CONNECT_CODE_CELL</span> <span class="o">=</span> <span class="n">dedent</span><span class="p">(</span><span class="n">DB_CONNECT_CODE_CELL</span><span class="p">)</span>
+
+<span class="c1"># Insert inputs into the notebook</span>
+<span class="n">INPUTS_CODE_CELL</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    # Inputs loading</span>
+<span class="s2">    with shelve.open(out_path_db) as notebook_db:</span>
+<span class="s2">        inputs = {**notebook_db}</span>
+
+<span class="s2">        locals().update(inputs)</span>
+<span class="s2">&quot;&quot;&quot;</span>
+<span class="n">INPUTS_CODE_CELL</span> <span class="o">=</span> <span class="n">dedent</span><span class="p">(</span><span class="n">INPUTS_CODE_CELL</span><span class="p">)</span>
+
+<span class="n">INPUTS_DISPLAY</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    for k, v in inputs.items():</span>
+<span class="s2">        if isinstance(v, str):</span>
+<span class="s2">            print(f&quot;</span><span class="si">{k}</span><span class="s2"> = &#39;</span><span class="si">{v}</span><span class="s2">&#39;&quot;)</span>
+<span class="s2">        else:</span>
+<span class="s2">            print(f&quot;</span><span class="si">{k}</span><span class="s2"> = </span><span class="si">{v}</span><span class="s2">&quot;)</span>
+<span class="s2">&quot;&quot;&quot;</span> <span class="c1"># it is better than pprint, because pprint adds quotes on variable names</span>
+<span class="c1"># TODO: think about indentation for dicts and lists</span>
+<span class="n">INPUTS_DISPLAY</span> <span class="o">=</span> <span class="n">dedent</span><span class="p">(</span><span class="n">INPUTS_DISPLAY</span><span class="p">)</span>
+
+<span class="c1"># Save notebook outputs</span>
+<span class="n">OUTPUTS_CODE_CELL</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    # Output dict preparation</span>
+<span class="s2">    output = {{}}</span>
+<span class="s2">    outputs = </span><span class="si">{}</span>
+
+<span class="s2">    for value_name in outputs:</span>
+<span class="s2">        if value_name in locals():</span>
+<span class="s2">            output[value_name] = locals()[value_name]</span>
+
+<span class="s2">    with shelve.open(out_path_db) as notebook_db:</span>
+<span class="s2">        notebook_db[&#39;outputs&#39;] = output</span>
+<span class="s2">&quot;&quot;&quot;</span>
+<span class="n">OUTPUTS_CODE_CELL</span> <span class="o">=</span> <span class="n">dedent</span><span class="p">(</span><span class="n">OUTPUTS_CODE_CELL</span><span class="p">)</span>
+
+<span class="n">OUTPUTS_DISPLAY</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    for k, v in output.items():</span>
+<span class="s2">        if isinstance(v, str):</span>
+<span class="s2">            print(f&quot;</span><span class="si">{k}</span><span class="s2"> = &#39;</span><span class="si">{v}</span><span class="s2">&#39;&quot;)</span>
+<span class="s2">        else:</span>
+<span class="s2">            print(f&quot;</span><span class="si">{k}</span><span class="s2"> = </span><span class="si">{v}</span><span class="s2">&quot;)</span>
+<span class="s2">&quot;&quot;&quot;</span>
+<span class="n">OUTPUTS_DISPLAY</span> <span class="o">=</span> <span class="n">dedent</span><span class="p">(</span><span class="n">OUTPUTS_DISPLAY</span><span class="p">)</span>
+
+
+
+<span class="c1"># Main functions</span>
+<div class="viewcode-block" id="exec_notebook">
+<a class="viewcode-back" href="../../api/nbtools.html#nbtools.exec_notebook.exec_notebook">[docs]</a>
+<span class="nd">@run_in_process</span>
+<span class="k">def</span> <span class="nf">exec_notebook</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">outputs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">inputs_pos</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">replace_inputs_pos</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                  <span class="n">display_inputs</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">display_outputs</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                  <span class="n">working_dir</span> <span class="o">=</span> <span class="s1">&#39;./&#39;</span><span class="p">,</span> <span class="n">execute_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                  <span class="n">out_path_db</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">out_path_ipynb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">out_path_html</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">remove_db</span><span class="o">=</span><span class="s1">&#39;always&#39;</span><span class="p">,</span>
+                  <span class="n">add_timestamp</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">hide_code_cells</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">display_links</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                  <span class="n">raise_exception</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">return_notebook</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">_output_queue</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Execute a Jupyter Notebook programmatically.</span>
+<span class="sd">    Heavily inspired by https://github.com/tritemio/nbrun.</span>
+
+<span class="sd">    Intended to be an analog of ``exec``, providing a way to inject / extract variables from the execution.</span>
+<span class="sd">    For a detailed description of how to do that, check the ``inputs`` and ``outputs`` parameters.</span>
+<span class="sd">    The executed notebook is optionally saved to disk as ``.ipynb`` / ``.html`` file: we strongly recommend always</span>
+<span class="sd">    doing so.</span>
+
+<span class="sd">    The ``raise_exception`` flag defines the behavior if the execution of the notebook fails due to an exception.</span>
+
+<span class="sd">    Under the hood, this function does the following:</span>
+<span class="sd">        * Create an internal database to communicate variables (both ``inputs`` and ``outputs``). Save ``inputs`` to it.</span>
+<span class="sd">        * Add a cell for reading ``inputs`` from the internal database, add a cell for saving ``outputs`` to it.</span>
+<span class="sd">        * Execute notebook.</span>
+<span class="sd">        * Handle exceptions.</span>
+<span class="sd">        * Read ``outputs`` from the database.</span>
+<span class="sd">        * Add a timestamp cell to the notebook, if needed.</span>
+<span class="sd">        * Save the executed notebook as ``.ipynb`` and / or ``.html``.</span>
+<span class="sd">        * Return a dictionary with intermediate results, execution info and values of ``outputs`` variables.</span>
+
+<span class="sd">    If there are no ``inputs`` or ``outputs``, a database is not created and additional cells are not inserted.</span>
+<span class="sd">    Note, if either of them is provided, then one of ``out_path_ipynb`` or ``out_path_db`` must be explicitly defined.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    path : str</span>
+<span class="sd">        Path to the notebook to execute.</span>
+<span class="sd">    inputs : dict, optional</span>
+<span class="sd">        Inputs for execution are essentially equivalent to notebook ``globals``.</span>
+<span class="sd">        Must be a dictionary with variable names and their values; therefore, keys must be valid Python identifiers.</span>
+<span class="sd">        Under the hood, inputs are saved into a database, loaded in the notebook in a separate cell, that is inserted at</span>
+<span class="sd">        the ``inputs_pos`` position. Therefore, values must be serializable.</span>
+<span class="sd">    outputs : str or iterable of str, optional</span>
+<span class="sd">        The list of variable names to return from the notebook.</span>
+<span class="sd">        Extracted from the notebook in a separate cell, which is inserted at the last position.</span>
+<span class="sd">        Note, if some of the variables don&#39;t exist, no errors are raised.</span>
+<span class="sd">    inputs_pos : int, optional</span>
+<span class="sd">        Position to insert the cell with ``inputs`` loading into the notebook.</span>
+<span class="sd">    replace_inputs_pos : int, optional</span>
+<span class="sd">        Whether to replace ``inputs_pos`` code cell with ``inputs`` or insert a new one.</span>
+<span class="sd">    display_inputs : bool, optional</span>
+<span class="sd">        Whether to display ``inputs`` or not.</span>
+<span class="sd">        Under the hood, inputs are provided using a shelve database. If ``display_inputs=True``, variables will be</span>
+<span class="sd">        inserted in the cell in the following manner: ``input_name = input_value``, instead of importing code from</span>
+<span class="sd">        shelve.</span>
+<span class="sd">    display_outputs : bool, optional</span>
+<span class="sd">        Whether to display ``outputs`` or not.</span>
+<span class="sd">        Under the hood, outputs are saved using a shelve database. If ``display_outputs=True``, variables will be shown</span>
+<span class="sd">        in the last cell in the following manner: ``print(input_name)``, instead of dumping code into the database.</span>
+<span class="sd">    working_dir : str</span>
+<span class="sd">        The working directory of starting the kernel.</span>
+<span class="sd">    out_path_db : str, optional</span>
+<span class="sd">        Path to save the internal database files (without file extension).</span>
+<span class="sd">        If not provided, then it is inferred from ``out_path_ipynb``.</span>
+<span class="sd">    out_path_ipynb : str, optional</span>
+<span class="sd">        Path to save the output ipynb file.</span>
+<span class="sd">    out_path_html : str, optional</span>
+<span class="sd">        Path to save the output html file.</span>
+<span class="sd">    remove_db : str, optional</span>
+<span class="sd">        Whether to remove the internal database after notebook execution. Possible options are:</span>
+<span class="sd">            - ``&#39;always&#39;``: remove the database after notebook execution</span>
+<span class="sd">            - ``&#39;not_failed_case&#39;``: remove the database if there wasn&#39;t any execution failure</span>
+<span class="sd">            - ``&#39;never&#39;``: don&#39;t remove the database after notebook execution</span>
+
+<span class="sd">        Running :func:`~.exec_notebook` with the ``&#39;not_failed_case&#39;`` or ``&#39;never&#39;`` option helps to reproduce failures</span>
+<span class="sd">        in the ``out_path_ipynb`` notebook: it will take the inputs from the saved shelve database.</span>
+<span class="sd">        Note, that the database exists only if inputs and / or outputs are provided.</span>
+<span class="sd">    execute_kwargs : dict, optional</span>
+<span class="sd">        Parameters of :class:`nbconvert.preprocessors.ExecutePreprocessor`.</span>
+<span class="sd">        For example, you can provide ``timeout``, ``kernel_name``, ``resources`` (such as metadata)</span>
+<span class="sd">        and other :class:`nbclient.client.NotebookClient` arguments.</span>
+<span class="sd">    add_timestamp : bool, optional</span>
+<span class="sd">        Whether to add a cell with execution information at the beginning of the saved notebook.</span>
+<span class="sd">    hide_code_cells : bool, optional</span>
+<span class="sd">        Whether to hide the code cells in the saved notebook.</span>
+<span class="sd">    display_links : bool, optional</span>
+<span class="sd">        Whether to display links to the executed notebook and html at execution.</span>
+<span class="sd">    raise_exception : bool, optional</span>
+<span class="sd">        Whether to re-raise exceptions from the notebook.</span>
+<span class="sd">    return_notebook : bool, optional</span>
+<span class="sd">        Whether to return the notebook object from this function.</span>
+<span class="sd">    _output_queue : None</span>
+<span class="sd">        Placeholder for the :func:`~.run_in_process` decorator to return this function result.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    exec_res : dict</span>
+<span class="sd">        Dictionary with the notebook execution results.</span>
+<span class="sd">        It provides the following information:</span>
+
+<span class="sd">            - ``&#39;failed&#39;`` : ``bool``</span>
+<span class="sd">                Whether the notebook execution failed.</span>
+<span class="sd">            - ``&#39;outputs&#39;`` : ``dict``</span>
+<span class="sd">                Saved notebook local variables. Is not presented in ``exec_res`` dict, if ``outputs``</span>
+<span class="sd">                argument is ``None.``</span>
+<span class="sd">            - ``&#39;failed cell number&#39;`` : ``int``</span>
+<span class="sd">                An error cell execution number (if notebook failed).</span>
+<span class="sd">            - ``&#39;traceback&#39;`` : ``str``</span>
+<span class="sd">                Traceback message from the notebook (if notebook failed).</span>
+<span class="sd">            - ``&#39;notebook&#39;`` : :class:`nbformat.notebooknode.NotebookNode`, optional</span>
+<span class="sd">                Executed notebook object. Note that this output is provided only if ``return_notebook`` is ``True``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># pylint: disable=bare-except, lost-exception, return-in-finally</span>
+    <span class="kn">import</span> <span class="nn">nbformat</span>
+    <span class="kn">from</span> <span class="nn">jupyter_client.manager</span> <span class="kn">import</span> <span class="n">KernelManager</span>
+    <span class="kn">from</span> <span class="nn">nbconvert.preprocessors</span> <span class="kn">import</span> <span class="n">ExecutePreprocessor</span>
+    <span class="kn">import</span> <span class="nn">shelve</span>
+    <span class="kn">from</span> <span class="nn">dill</span> <span class="kn">import</span> <span class="n">Pickler</span><span class="p">,</span> <span class="n">Unpickler</span>
+
+    <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">outputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Set `out_path_db` value</span>
+        <span class="k">if</span> <span class="n">out_path_db</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">out_path_ipynb</span><span class="p">:</span>
+                <span class="n">out_path_db</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">out_path_ipynb</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;_db&#39;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">error_message</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="s2">                                Invalid value for `out_path_db` argument. If `inputs` or `outputs` are provided,</span>
+<span class="s2">                                then you need to provide `out_path_db` or `out_path_ipynb` arguments.&quot;&quot;&quot;</span>
+                <span class="n">error_message</span> <span class="o">=</span> <span class="n">dedent</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+
+        <span class="c1"># `out_path_db` is db path for current method, for db reading from the executed notebook we need relative path:</span>
+        <span class="n">working_dir_out_path_db</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">relpath</span><span class="p">(</span><span class="n">out_path_db</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="n">working_dir</span><span class="p">)</span>
+
+        <span class="c1"># Create a shelve database</span>
+        <span class="n">shelve</span><span class="o">.</span><span class="n">Pickler</span> <span class="o">=</span> <span class="n">Pickler</span>
+        <span class="n">shelve</span><span class="o">.</span><span class="n">Unpickler</span> <span class="o">=</span> <span class="n">Unpickler</span>
+
+        <span class="k">with</span> <span class="n">shelve</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">out_path_db</span><span class="p">)</span> <span class="k">as</span> <span class="n">notebook_db</span><span class="p">:</span>
+            <span class="n">notebook_db</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">outputs</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">outputs</span><span class="p">]</span>
+
+    <span class="n">execute_kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;timeout&#39;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">}</span> <span class="k">if</span> <span class="n">execute_kwargs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{</span><span class="s1">&#39;timeout&#39;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">**</span><span class="n">execute_kwargs</span><span class="p">}</span>
+    <span class="n">executor</span> <span class="o">=</span> <span class="n">ExecutePreprocessor</span><span class="p">(</span><span class="o">**</span><span class="n">execute_kwargs</span><span class="p">)</span>
+    <span class="n">kernel_manager</span> <span class="o">=</span> <span class="n">KernelManager</span><span class="p">()</span>
+
+    <span class="c1"># Notebook preparation:</span>
+    <span class="c1"># Read the notebook, insert a cell with inputs, insert another cell for outputs extraction</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+        <span class="n">notebook</span> <span class="o">=</span> <span class="n">nbformat</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="n">as_version</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Save `inputs` in the shelve database and create a cell in the notebook</span>
+        <span class="c1"># for parameters extraction</span>
+        <span class="k">with</span> <span class="n">shelve</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">out_path_db</span><span class="p">)</span> <span class="k">as</span> <span class="n">notebook_db</span><span class="p">:</span>
+            <span class="n">notebook_db</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+
+        <span class="n">code</span> <span class="o">=</span> <span class="n">CELL_INSERT_COMMENT</span> <span class="o">+</span> <span class="n">DB_CONNECT_CODE_CELL</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">repr</span><span class="p">(</span><span class="n">working_dir_out_path_db</span><span class="p">))</span> <span class="o">+</span> <span class="n">INPUTS_CODE_CELL</span>
+        <span class="k">if</span> <span class="n">display_inputs</span><span class="p">:</span>
+            <span class="n">code</span> <span class="o">+=</span> <span class="n">INPUTS_DISPLAY</span>
+
+        <span class="k">if</span> <span class="n">replace_inputs_pos</span><span class="p">:</span>
+            <span class="n">notebook</span><span class="p">[</span><span class="s1">&#39;cells&#39;</span><span class="p">][</span><span class="n">inputs_pos</span><span class="p">]</span> <span class="o">=</span> <span class="n">nbformat</span><span class="o">.</span><span class="n">v4</span><span class="o">.</span><span class="n">new_code_cell</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">notebook</span><span class="p">[</span><span class="s1">&#39;cells&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">inputs_pos</span><span class="p">,</span> <span class="n">nbformat</span><span class="o">.</span><span class="n">v4</span><span class="o">.</span><span class="n">new_code_cell</span><span class="p">(</span><span class="n">code</span><span class="p">))</span>
+
+
+    <span class="k">if</span> <span class="n">outputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Create a cell to extract outputs from the notebook</span>
+        <span class="c1"># It saves locals from the notebook with preferred names in the shelve database</span>
+        <span class="c1"># This cell will be executed in error case too</span>
+        <span class="n">code</span> <span class="o">=</span> <span class="n">CELL_INSERT_COMMENT</span> <span class="o">+</span> \
+               <span class="p">(</span><span class="n">DB_CONNECT_CODE_CELL</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">repr</span><span class="p">(</span><span class="n">working_dir_out_path_db</span><span class="p">))</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">inputs</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">+</span> \
+               <span class="n">OUTPUTS_CODE_CELL</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">outputs</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">display_outputs</span><span class="p">:</span>
+            <span class="n">code</span> <span class="o">+=</span> <span class="n">OUTPUTS_DISPLAY</span>
+
+        <span class="n">output_cell</span> <span class="o">=</span> <span class="n">nbformat</span><span class="o">.</span><span class="n">v4</span><span class="o">.</span><span class="n">new_code_cell</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+        <span class="n">notebook</span><span class="p">[</span><span class="s1">&#39;cells&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">output_cell</span><span class="p">)</span>
+
+    <span class="c1"># Execute the notebook</span>
+    <span class="n">start_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="n">exec_failed</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">executor</span><span class="o">.</span><span class="n">preprocess</span><span class="p">(</span><span class="n">notebook</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;metadata&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;path&#39;</span><span class="p">:</span> <span class="n">working_dir</span><span class="p">}},</span> <span class="n">km</span><span class="o">=</span><span class="n">kernel_manager</span><span class="p">)</span>
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">exec_failed</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="c1"># Save notebook outputs in the shelve db</span>
+        <span class="k">if</span> <span class="n">outputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">executor</span><span class="o">.</span><span class="n">kc</span> <span class="o">=</span> <span class="n">kernel_manager</span><span class="o">.</span><span class="n">client</span><span class="p">()</span> <span class="c1"># For compatibility with 5.x.x version of `nbconvert`</span>
+            <span class="n">executor</span><span class="o">.</span><span class="n">preprocess_cell</span><span class="p">(</span><span class="n">output_cell</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;metadata&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;path&#39;</span><span class="p">:</span> <span class="n">working_dir</span><span class="p">}},</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="c1"># Shutdown kernel</span>
+        <span class="n">kernel_manager</span><span class="o">.</span><span class="n">cleanup_resources</span><span class="p">()</span>
+        <span class="n">kernel_manager</span><span class="o">.</span><span class="n">shutdown_kernel</span><span class="p">(</span><span class="n">now</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># Extract information from the database and remove it (if exists)</span>
+        <span class="k">if</span> <span class="n">outputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">shelve</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">out_path_db</span><span class="p">)</span> <span class="k">as</span> <span class="n">notebook_db</span><span class="p">:</span>
+                <span class="n">outputs_values</span> <span class="o">=</span> <span class="n">notebook_db</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;outputs&#39;</span><span class="p">,</span> <span class="p">{})</span>
+
+        <span class="c1"># Check if something went wrong</span>
+        <span class="n">failed</span><span class="p">,</span> <span class="n">error_cell_num</span><span class="p">,</span> <span class="n">traceback_message</span> <span class="o">=</span> <span class="n">extract_traceback</span><span class="p">(</span><span class="n">notebook</span><span class="o">=</span><span class="n">notebook</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">exec_failed</span><span class="p">:</span>
+            <span class="n">failed</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">traceback_message</span> <span class="o">+=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Notebook execution failed</span><span class="se">\n</span><span class="s1">&#39;</span>
+
+        <span class="c1"># Remove database</span>
+        <span class="k">if</span> <span class="n">out_path_db</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span><span class="n">remove_db</span> <span class="o">==</span> <span class="s1">&#39;always&#39;</span> <span class="ow">or</span> <span class="p">(</span><span class="n">remove_db</span> <span class="o">==</span> <span class="s1">&#39;not_failed_case&#39;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">failed</span><span class="p">)):</span>
+            <span class="n">db_paths</span> <span class="o">=</span> <span class="n">glob</span><span class="p">(</span><span class="n">out_path_db</span> <span class="o">+</span> <span class="s1">&#39;*&#39;</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">path_</span> <span class="ow">in</span> <span class="n">db_paths</span><span class="p">:</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">path_</span><span class="p">)</span>
+
+        <span class="c1"># Prepare execution results: execution state, notebook outputs and error info (if exists)</span>
+        <span class="k">if</span> <span class="n">failed</span><span class="p">:</span>
+            <span class="n">exec_res</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;failed&#39;</span><span class="p">:</span> <span class="n">failed</span><span class="p">,</span> <span class="s1">&#39;failed cell number&#39;</span><span class="p">:</span> <span class="n">error_cell_num</span><span class="p">,</span> <span class="s1">&#39;traceback&#39;</span><span class="p">:</span> <span class="n">traceback_message</span><span class="p">}</span>
+
+            <span class="c1"># Re-raise exception if needed</span>
+            <span class="k">if</span> <span class="n">raise_exception</span><span class="p">:</span>
+                <span class="n">_output_queue</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">exec_res</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">exec_res</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;failed&#39;</span><span class="p">:</span> <span class="n">failed</span><span class="p">,</span> <span class="s1">&#39;failed cell number&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">&#39;traceback&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">}</span>
+
+        <span class="k">if</span> <span class="n">outputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">exec_res</span><span class="p">[</span><span class="s1">&#39;outputs&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">outputs_values</span>
+
+        <span class="c1"># Notebook postprocessing: add timestamp, mask db reading/dumping code</span>
+        <span class="k">if</span> <span class="n">add_timestamp</span><span class="p">:</span>
+            <span class="n">timestamp</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s2">&quot;**Executed:** </span><span class="si">{</span><span class="n">time</span><span class="o">.</span><span class="n">ctime</span><span class="p">(</span><span class="n">start_time</span><span class="p">)</span><span class="si">}</span><span class="s2">&lt;br&gt;&quot;</span>
+                         <span class="sa">f</span><span class="s2">&quot;**Duration:** </span><span class="si">{</span><span class="n">time</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">&#39;%H:%M:%S&#39;</span><span class="p">,</span><span class="w"> </span><span class="n">time</span><span class="o">.</span><span class="n">gmtime</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">start_time</span><span class="p">))</span><span class="si">}</span><span class="s2">&lt;br&gt;&quot;</span>
+                         <span class="sa">f</span><span class="s2">&quot;**Autogenerated from:** [</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">]</span><span class="se">\n\n</span><span class="s2">---&quot;</span><span class="p">)</span>
+            <span class="n">timestamp_cell</span> <span class="o">=</span> <span class="n">nbformat</span><span class="o">.</span><span class="n">v4</span><span class="o">.</span><span class="n">new_markdown_cell</span><span class="p">(</span><span class="n">timestamp</span><span class="p">)</span>
+            <span class="n">notebook</span><span class="p">[</span><span class="s1">&#39;cells&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">timestamp_cell</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">display_inputs</span> <span class="ow">and</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">pos</span> <span class="o">=</span> <span class="n">inputs_pos</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">add_timestamp</span> <span class="k">else</span> <span class="n">inputs_pos</span>
+            <span class="n">_display_inputs_reading</span><span class="p">(</span><span class="n">notebook</span><span class="o">=</span><span class="n">notebook</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="n">pos</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">display_outputs</span> <span class="ow">and</span> <span class="n">outputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">pos</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">notebook</span><span class="p">[</span><span class="s1">&#39;cells&#39;</span><span class="p">])</span> <span class="o">-</span> <span class="mi">1</span>
+            <span class="n">_display_outputs_dumping</span><span class="p">(</span><span class="n">notebook</span><span class="o">=</span><span class="n">notebook</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="n">pos</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">hide_code_cells</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="n">notebook</span><span class="p">[</span><span class="s1">&#39;cells&#39;</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">cell</span><span class="p">[</span><span class="s1">&#39;cell_type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;code&#39;</span><span class="p">:</span>
+                    <span class="n">cell</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;jupyter&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;source_hidden&quot;</span><span class="p">:</span> <span class="s2">&quot;true&quot;</span><span class="p">}})</span>
+
+        <span class="c1"># Save the executed notebook/HTML to disk</span>
+        <span class="k">if</span> <span class="n">out_path_ipynb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">save_notebook</span><span class="p">(</span><span class="n">notebook</span><span class="o">=</span><span class="n">notebook</span><span class="p">,</span> <span class="n">out_path_ipynb</span><span class="o">=</span><span class="n">out_path_ipynb</span><span class="p">,</span> <span class="n">display_link</span><span class="o">=</span><span class="n">display_links</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">out_path_html</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">notebook_to_html</span><span class="p">(</span><span class="n">notebook</span><span class="o">=</span><span class="n">notebook</span><span class="p">,</span> <span class="n">out_path_html</span><span class="o">=</span><span class="n">out_path_html</span><span class="p">,</span> <span class="n">display_link</span><span class="o">=</span><span class="n">display_links</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">return_notebook</span><span class="p">:</span>
+            <span class="n">exec_res</span><span class="p">[</span><span class="s1">&#39;notebook&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">notebook</span>
+
+        <span class="n">_output_queue</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">exec_res</span><span class="p">)</span> <span class="c1"># return for parent process</span>
+    <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<span class="c1"># Functions for database operations cells masking</span>
+<span class="k">def</span> <span class="nf">_display_inputs_reading</span><span class="p">(</span><span class="n">notebook</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Replace database reading code by variables initialization mask.</span>
+
+<span class="sd">    Result is a code cell with the following view:</span>
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">        varible_name_1 = varible_value_1</span>
+<span class="sd">        varible_name_2 = varible_value_2</span>
+<span class="sd">        ...</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">nbformat</span>
+
+    <span class="n">execution_count</span> <span class="o">=</span> <span class="n">notebook</span><span class="p">[</span><span class="s1">&#39;cells&#39;</span><span class="p">][</span><span class="n">pos</span><span class="p">][</span><span class="s1">&#39;execution_count&#39;</span><span class="p">]</span>
+
+    <span class="n">code_mask</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">notebook</span><span class="p">[</span><span class="s1">&#39;cells&#39;</span><span class="p">][</span><span class="n">pos</span><span class="p">][</span><span class="s1">&#39;outputs&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;text&#39;</span><span class="p">])[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">cell_mask</span> <span class="o">=</span> <span class="n">nbformat</span><span class="o">.</span><span class="n">v4</span><span class="o">.</span><span class="n">new_code_cell</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">code_mask</span><span class="p">,</span> <span class="n">execution_count</span><span class="o">=</span><span class="n">execution_count</span><span class="p">)</span>
+    <span class="n">notebook</span><span class="p">[</span><span class="s1">&#39;cells&#39;</span><span class="p">][</span><span class="n">pos</span><span class="p">]</span> <span class="o">=</span> <span class="n">cell_mask</span>
+
+<span class="k">def</span> <span class="nf">_display_outputs_dumping</span><span class="p">(</span><span class="n">notebook</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Replace database dumping code by printing outputs.</span>
+
+<span class="sd">    Result is a code cell with the following view and corresponding output:</span>
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">        print(varible_name_1)</span>
+<span class="sd">        print(varible_name_2)</span>
+<span class="sd">        ...</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">nbformat</span>
+
+    <span class="n">execution_count</span> <span class="o">=</span> <span class="n">notebook</span><span class="p">[</span><span class="s1">&#39;cells&#39;</span><span class="p">][</span><span class="n">pos</span><span class="p">][</span><span class="s1">&#39;execution_count&#39;</span><span class="p">]</span>
+    <span class="n">outputs_variables</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">notebook</span><span class="p">[</span><span class="s1">&#39;cells&#39;</span><span class="p">][</span><span class="n">pos</span><span class="p">][</span><span class="s1">&#39;outputs&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;text&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="n">code_mask</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="n">text_mask</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+    <span class="k">for</span> <span class="n">variable</span> <span class="ow">in</span> <span class="n">outputs_variables</span><span class="p">:</span>
+        <span class="n">separator_pos</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">variable</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39; = &#39;</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">separator_pos</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="n">variable_name</span> <span class="o">=</span> <span class="n">variable</span><span class="p">[:</span><span class="n">separator_pos</span><span class="p">]</span>
+            <span class="n">variable_value</span> <span class="o">=</span> <span class="n">variable</span><span class="p">[</span><span class="n">separator_pos</span><span class="o">+</span><span class="mi">2</span><span class="p">:]</span> <span class="o">+</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span>
+
+            <span class="n">code_mask</span> <span class="o">+=</span> <span class="sa">f</span><span class="s1">&#39;print(</span><span class="si">{</span><span class="n">variable_name</span><span class="si">}</span><span class="s1">)</span><span class="se">\n</span><span class="s1">&#39;</span>
+            <span class="n">text_mask</span> <span class="o">+=</span> <span class="n">variable_value</span>
+
+    <span class="n">code_mask</span> <span class="o">=</span> <span class="n">code_mask</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="c1"># remove extra &#39;\n&#39;</span>
+
+    <span class="n">outputs_mask</span> <span class="o">=</span>  <span class="p">[</span><span class="n">nbformat</span><span class="o">.</span><span class="n">v4</span><span class="o">.</span><span class="n">new_output</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="n">text_mask</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;stdout&#39;</span><span class="p">,</span> <span class="n">output_type</span><span class="o">=</span><span class="s1">&#39;stream&#39;</span><span class="p">)]</span>
+
+    <span class="n">cell_mask</span> <span class="o">=</span> <span class="n">nbformat</span><span class="o">.</span><span class="n">v4</span><span class="o">.</span><span class="n">new_code_cell</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">code_mask</span><span class="p">,</span> <span class="n">execution_count</span><span class="o">=</span><span class="n">execution_count</span><span class="p">,</span> <span class="n">outputs</span><span class="o">=</span><span class="n">outputs_mask</span><span class="p">)</span>
+    <span class="n">notebook</span><span class="p">[</span><span class="s1">&#39;cells&#39;</span><span class="p">][</span><span class="n">pos</span><span class="p">]</span> <span class="o">=</span> <span class="n">cell_mask</span>
+
+
+<span class="c1"># Save notebook functions</span>
+<span class="k">def</span> <span class="nf">save_notebook</span><span class="p">(</span><span class="n">notebook</span><span class="p">,</span> <span class="n">out_path_ipynb</span><span class="p">,</span> <span class="n">display_link</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Save an instance of :class:``nbformat.notebooknode.NotebookNode`` as ipynb file.&quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">nbformat</span>
+    <span class="kn">from</span> <span class="nn">IPython.display</span> <span class="kn">import</span> <span class="n">display</span><span class="p">,</span> <span class="n">FileLink</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">out_path_ipynb</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+        <span class="n">nbformat</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">notebook</span><span class="p">,</span> <span class="n">file</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">display_link</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Executed notebook link:&#39;</span><span class="p">)</span>
+        <span class="n">display</span><span class="p">(</span><span class="n">FileLink</span><span class="p">(</span><span class="n">out_path_ipynb</span><span class="p">))</span>
+
+<span class="k">def</span> <span class="nf">notebook_to_html</span><span class="p">(</span><span class="n">notebook</span><span class="p">,</span> <span class="n">out_path_html</span><span class="p">,</span> <span class="n">display_link</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Save an instance of :class:``nbformat.notebooknode.NotebookNode`` as html file.&quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">nbconvert</span> <span class="kn">import</span> <span class="n">HTMLExporter</span>
+    <span class="kn">from</span> <span class="nn">IPython.display</span> <span class="kn">import</span> <span class="n">display</span><span class="p">,</span> <span class="n">FileLink</span>
+
+    <span class="n">html_exporter</span> <span class="o">=</span> <span class="n">HTMLExporter</span><span class="p">()</span>
+    <span class="n">body</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">html_exporter</span><span class="o">.</span><span class="n">from_notebook_node</span><span class="p">(</span><span class="n">notebook</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">out_path_html</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">display_link</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Executed notebook link:&#39;</span><span class="p">)</span>
+        <span class="n">display</span><span class="p">(</span><span class="n">FileLink</span><span class="p">(</span><span class="n">out_path_html</span><span class="p">))</span>
+
+
+<span class="c1"># Traceback postprocessing</span>
+<div class="viewcode-block" id="extract_traceback">
+<a class="viewcode-back" href="../../api/nbtools.html#nbtools.exec_notebook.extract_traceback">[docs]</a>
+<span class="k">def</span> <span class="nf">extract_traceback</span><span class="p">(</span><span class="n">notebook</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Extracts information about an error from the notebook.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    notebook: :class:`nbformat.notebooknode.NotebookNode`</span>
+<span class="sd">        Executed notebook to find an error traceback.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    tuple</span>
+<span class="sd">        Tuple of three elements:</span>
+
+<span class="sd">            - ``bool``</span>
+<span class="sd">                Whether the executed notebook has an error traceback.</span>
+
+<span class="sd">            - ``int`` or ``None``</span>
+<span class="sd">                Number of a cell with a traceback.</span>
+<span class="sd">                If ``None``, then the notebook doesn&#39;t contain an error traceback.</span>
+
+<span class="sd">            - ``str``</span>
+<span class="sd">                Error traceback if exists.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="n">notebook</span><span class="p">[</span><span class="s1">&#39;cells&#39;</span><span class="p">]:</span>
+        <span class="c1"># Find a cell output with a traceback and extract the traceback</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;outputs&#39;</span><span class="p">,</span> <span class="p">[])</span>
+
+        <span class="k">for</span> <span class="n">output</span> <span class="ow">in</span> <span class="n">outputs</span><span class="p">:</span>
+            <span class="n">traceback</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;traceback&#39;</span><span class="p">,</span> <span class="p">[])</span>
+
+            <span class="k">if</span> <span class="n">traceback</span><span class="p">:</span>
+                <span class="n">traceback</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">traceback</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">True</span><span class="p">,</span> <span class="n">cell</span><span class="p">[</span><span class="s1">&#39;execution_count&#39;</span><span class="p">],</span> <span class="n">traceback</span>
+
+    <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;&quot;</span></div>
+
+
+<span class="c1"># Aliases</span>
+<span class="n">run_notebook</span> <span class="o">=</span> <span class="n">exec_notebook</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Analysis Center.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
