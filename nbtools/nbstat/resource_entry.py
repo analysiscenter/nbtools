@@ -1,5 +1,6 @@
 """ ResourceEntry -- a dict-like class to hold all properties (Resources) of an entry. """
 from datetime import datetime
+import psutil
 
 from .resource import Resource
 from .utils import format_memory
@@ -75,7 +76,10 @@ class ResourceEntry(dict):
         elif resource == Resource.CPU:
             process = self[Resource.PROCESS]
             if process is not None:
-                data = process.cpu_percent()
+                try:
+                    data = process.cpu_percent()
+                except psutil.NoSuchProcess:
+                    data = 0.0
                 data = round(data)
 
                 style = terminal.bold if data > 30 else ''
