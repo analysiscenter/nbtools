@@ -27,7 +27,7 @@ setup(
     zip_safe=False,
     platforms='any',
     install_requires=[
-        'pynvml>=11.5.0',
+        'nvidia-ml-py>=12.0.0',
         'blessed>=1.17',
         'psutil>=5.6',
         'requests>=2.24',

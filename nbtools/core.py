@@ -155,7 +155,7 @@ def get_available_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False,
     try:
         import pynvml
     except ImportError as exception:
-        raise ImportError('Install Python interface for nvidia_smi') from exception
+        raise ImportError('Install nvidia-ml-py package') from exception
 
     try:
         error_message = None
@@ -220,7 +220,7 @@ def get_gpu_free_memory(index, ratio=True):
     try:
         import pynvml
     except ImportError as exception:
-        raise ImportError('Install Python interface for nvidia_smi') from exception
+        raise ImportError('Install nvidia-ml-py package') from exception
 
     pynvml.nvmlInit()
     pynvml.nvmlDeviceGetCount()
