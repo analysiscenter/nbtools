@@ -31,6 +31,7 @@ setup(
         'blessed>=1.17',
         'psutil>=5.6',
         'requests>=2.24',
+        'ruff>=0.1.0',
     ],
     extras_require={
         'nbrun': [
