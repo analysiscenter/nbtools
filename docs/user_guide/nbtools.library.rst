@@ -5,24 +5,24 @@ Jupyter Notebooks: linting and execution
 Other than `nbstat / nbwatch` monitoring utilities, this library provides a few useful tools for working with notebooks and GPUs.
 
 
-ruff_notebook
-*************
+pylint_notebook
+***************
 
-Function that checks for errors in Jupyter Notebooks with Python code using `ruff <https://docs.astral.sh/ruff/>`_, a fast Python linter. It tries to enforce a coding standard, looks for code smells, and can detect various issues including imports, formatting, and potential bugs.
+Shamelessly taken from `pylint page <https://pylint.pycqa.org/en/latest/>`_
 
-Using it is as easy as:
+Function that checks for errors in Jupyter Notebooks with Python code, tries to enforce a coding standard and looks for code smells. It can also look for certain type errors, it can recommend suggestions about how particular blocks can be refactored and can offer you details about the code's complexity.
+
+Using it as easy as:
 
 .. code-block:: python
 
-    from nbtools import ruff_notebook
-    ruff_notebook(path_to_ipynb,               # If not provided, use path to the current notebook
-                  ignore=['E402', 'F401'],     # Ignore specified ruff rule codes. Can be a list.
-                  config='path/to/ruff.toml')  # Custom ruff configuration file
-
-For backward compatibility, ``pylint_notebook`` is still available as an alias to ``ruff_notebook``.
+    from nbtools import pylint_notebook
+    pylint_notebook(path_to_ipynb,             # If not provided, use path to the current notebook
+                    disable='invalid-name',    # Disable specified Pylint checks. Can be a list.
+                    enable='import-error')     # Enable  specified Pylint checks. Can be a list.
 
 
-Under the hood, it converts `.ipynb` notebook to `.py` script, creates a custom `ruff.toml` configuration, runs `ruff` and removes all temporary files. Learn more about its usage in the [tutorial.](tutorials/NBstat.ipynb)
+Under the hood, it converts `.ipynb` notebook to `.py` script, creates a custom `.pylintrc` configuration, runs the `pylint` and removes all temporary files. Learn more about its usage in the [tutorial.](tutorials/NBstat.ipynb)
 
 exec_notebook
 *************

@@ -31,12 +31,14 @@ setup(
         'blessed>=1.17',
         'psutil>=5.6',
         'requests>=2.24',
-        'ruff>=0.1.0',
     ],
     extras_require={
         'nbrun': [
             'ipython>=7.10.0',
             'nbconvert>=5.6.1',
+        ],
+        'dev': [
+            'ruff>=0.1.0',
         ],
     },
     classifiers=[

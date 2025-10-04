@@ -11,8 +11,8 @@ jobs:
     steps:
     - uses: actions/checkout@v1
 
-    - name: Update pylint
-      run: pip3 install -U pylint
+    - name: Install ruff
+      run: pip3 install -U ruff
 
-    - name: Check pylint
-      run: pylint -rn --rcfile pylintrc nbtools
+    - name: Check ruff
+      run: ruff check nbtools
