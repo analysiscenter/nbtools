@@ -95,17 +95,12 @@ jobs:
       run: uv sync
 
     - name: Test import with uv
-      run: |
-        source .venv/bin/activate || .venv\\Scripts\\activate
-        python -c 'import nbtools; print("nbtools version:", nbtools.__version__)'
+      run: uv run python -c 'import nbtools; print("nbtools version:", nbtools.__version__)'
 
     - name: Test console scripts with uv
-      run: |
-        source .venv/bin/activate || .venv\\Scripts\\activate
-        nbstat --help
+      run: uv run nbstat --help
 
     - name: Test optional dependencies with uv
       run: |
         uv sync --extra dev --extra nbrun
-        source .venv/bin/activate || .venv\\Scripts\\activate
-        python -c 'import ruff; print("ruff available")'
+        uv run python -c 'import ruff; print("ruff available")'
