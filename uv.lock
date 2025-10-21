@@ -754,11 +754,12 @@ wheels = [
 
 [[package]]
 name = "py-nbtools"
+version = "0.9.15"
 source = { editable = "." }
 dependencies = [
     { name = "blessed" },
+    { name = "nvidia-ml-py" },
     { name = "psutil" },
-    { name = "pynvml" },
     { name = "requests" },
 ]
 
@@ -777,8 +778,8 @@ requires-dist = [
     { name = "blessed", specifier = ">=1.17" },
     { name = "ipython", marker = "extra == 'nbrun'", specifier = ">=7.10.0" },
     { name = "nbconvert", marker = "extra == 'nbrun'", specifier = ">=5.6.1" },
+    { name = "nvidia-ml-py", specifier = ">=12.0.0" },
     { name = "psutil", specifier = ">=5.6" },
-    { name = "pynvml", specifier = ">=11.5.0" },
     { name = "requests", specifier = ">=2.24" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
 ]
@@ -800,18 +801,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b0/77/a5b8c569bf593b0140bde72ea885a803b82086995367bf2037de0159d924/pygments-2.19.2.tar.gz", hash = "sha256:636cb2477cec7f8952536970bc533bc43743542f70392ae026374600add5b887", size = 4968631, upload-time = "2025-06-21T13:39:12.283Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/21/705964c7812476f378728bdf590ca4b771ec72385c533964653c68e86bdc/pygments-2.19.2-py3-none-any.whl", hash = "sha256:86540386c03d588bb81d44bc3928634ff26449851e99741617ecb9037ee5ec0b", size = 1225217, upload-time = "2025-06-21T13:39:07.939Z" },
-]
-
-[[package]]
-name = "pynvml"
-version = "13.0.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "nvidia-ml-py" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5c/57/da7dc63a79f59e082e26a66ac02d87d69ea316b35b35b7a00d82f3ce3d2f/pynvml-13.0.1.tar.gz", hash = "sha256:1245991d9db786b4d2f277ce66869bd58f38ac654e38c9397d18f243c8f6e48f", size = 35226, upload-time = "2025-09-05T20:33:25.377Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d7/4a/cac76c174bb439a0c46c9a4413fcbea5c6cabfb01879f7bbdb9fdfaed76c/pynvml-13.0.1-py3-none-any.whl", hash = "sha256:e2b20e0a501eeec951e2455b7ab444759cf048e0e13a57b08049fa2775266aa8", size = 28810, upload-time = "2025-09-05T20:33:24.13Z" },
 ]
 
 [[package]]
