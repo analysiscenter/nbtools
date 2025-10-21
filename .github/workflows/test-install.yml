@@ -92,9 +92,7 @@ jobs:
       uses: astral-sh/setup-uv@v2
 
     - name: Install with uv
-      run: |
-        uv venv
-        uv pip install -e .
+      run: uv sync
 
     - name: Test import with uv
       run: |
@@ -108,6 +106,6 @@ jobs:
 
     - name: Test optional dependencies with uv
       run: |
-        uv pip install -e .[dev,nbrun]
+        uv sync --extra dev --extra nbrun
         source .venv/bin/activate || .venv\\Scripts\\activate
         python -c 'import ruff; print("ruff available")'
