@@ -9,10 +9,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
 
-    - name: Update pylint
-      run: pip3 install -U pylint
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
 
-    - name: Check pylint
-      run: pylint -rn --rcfile pylintrc nbtools
+    - name: Install ruff
+      run: pip3 install -U ruff
+
+    - name: Check ruff
+      run: ruff check nbtools

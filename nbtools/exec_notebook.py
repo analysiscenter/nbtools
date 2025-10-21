@@ -1,5 +1,4 @@
 """ Functions for running Jupyter Notebooks programmatically."""
-#pylint: disable=import-outside-toplevel
 import os
 import time
 import json
@@ -10,7 +9,7 @@ from multiprocessing import Process, Queue
 import psutil
 
 
-TMP_DIR = '/tmp/nbtools_exec_notebook'
+TMP_DIR = '/tmp/nbtools_exec_notebook'  # noqa: S108
 os.makedirs(TMP_DIR, exist_ok=True)
 
 
@@ -19,7 +18,6 @@ def run_in_process(func):
     """ Decorator to run the ``func`` in a separate process for terminating all related processes properly. """
     @wraps(func)
     def _wrapper(*args, **kwargs):
-        # pylint: disable=broad-exception-caught, broad-exception-raised
         _output_queue = Queue()
         kwargs = {**kwargs, '_output_queue': _output_queue}
 
@@ -39,7 +37,7 @@ def run_in_process(func):
 
             output = _output_queue.get()
             process.join()
-        except (KeyboardInterrupt, Exception) as e:
+        except (KeyboardInterrupt, Exception) as e:  # noqa: BLE001
             output = {'failed': True, 'traceback': e}
 
             # Terminate all relevant processes when something went wrong, e.g. Keyboard Interrupt
@@ -245,7 +243,6 @@ def exec_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_
             - ``'notebook'`` : :class:`nbformat.notebooknode.NotebookNode`, optional
                 Executed notebook object. Note that this output is provided only if ``return_notebook`` is ``True``.
     """
-    # pylint: disable=bare-except, lost-exception, return-in-finally
     import nbformat
     from jupyter_client.manager import KernelManager
     from nbconvert.preprocessors import ExecutePreprocessor
@@ -321,7 +318,7 @@ def exec_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_
     exec_failed = False
     try:
         executor.preprocess(notebook, {'metadata': {'path': working_dir}}, km=kernel_manager)
-    except:
+    except:  # noqa: E722
         exec_failed = True
 
         # Save notebook outputs in the shelve db
@@ -359,7 +356,7 @@ def exec_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_
             # Re-raise exception if needed
             if raise_exception:
                 _output_queue.put(exec_res)
-                return None
+                return None  # noqa: RET501
         else:
             exec_res = {'failed': failed, 'failed cell number': None, 'traceback': ''}
 
@@ -397,7 +394,7 @@ def exec_notebook(path, inputs=None, outputs=None, inputs_pos=1, replace_inputs_
             exec_res['notebook'] = notebook
 
         _output_queue.put(exec_res) # return for parent process
-    return None
+    return None  # noqa: RET501
 
 # Functions for database operations cells masking
 def _display_inputs_reading(notebook, pos):

@@ -1,5 +1,4 @@
 """ Utility functions. """
-#pylint: disable=redefined-builtin
 import re
 import platform
 import linecache
@@ -25,7 +24,7 @@ def pid_to_name_linux(pid):
     try:
         line = linecache.getline(f'/proc/{pid}/status', 1)
         name = line.strip().split()[1]
-    except Exception: #pylint: disable=broad-except
+    except Exception:  # noqa: BLE001
         name = ''
     return name
 
@@ -42,7 +41,7 @@ def pid_to_ngid_linux(pid):
         line = linecache.getline(f'/proc/{pid}/status', 5)
         ngid = line.strip().split()[1]
         ngid = int(ngid)
-    except Exception: #pylint: disable=broad-except
+    except Exception:  # noqa: BLE001
         ngid = pid
     return ngid or pid
 

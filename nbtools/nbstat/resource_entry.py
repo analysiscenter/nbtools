@@ -39,7 +39,6 @@ class ResourceEntry(dict):
         kwargs : dict
             Other parameters for string creation like memory format, width, etc.
         """
-        #pylint: disable=too-many-statements
         resource = Resource.parse_alias(resource)
         default_string = '-'
         style, string = None, None
