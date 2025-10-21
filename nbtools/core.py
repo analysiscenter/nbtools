@@ -1,5 +1,4 @@
 """ Core utility functions to work with Jupyter Notebooks. """
-#pylint: disable=import-outside-toplevel
 import os
 import sys
 import re
@@ -34,7 +33,6 @@ def get_notebook_path():
 
     If run outside Jupyter notebook, returns None.
     """
-    #pylint: disable=missing-timeout
     if not in_notebook():
         return None
 
@@ -74,7 +72,7 @@ def get_notebook_name():
 
 def notebook_to_script(path_script, path_notebook=None, ignore_markdown=True, return_info=False):
     """ Convert a notebook to a script. """
-    import nbformat #pylint: disable=import-outside-toplevel
+    import nbformat
     path_notebook = path_notebook or get_notebook_path()
     if path_notebook is None:
         raise ValueError('Provide path to Jupyter Notebook or run `notebook_to_script` inside of it!')
@@ -267,7 +265,6 @@ def set_gpus(n=1, min_free_memory=0.9, max_processes=2, verbose=False, raise_err
     devices : list
         Indices of selected and reserved GPUs.
     """
-    #pylint: disable=consider-iterating-dictionary
     if 'CUDA_VISIBLE_DEVICES' in os.environ.keys():
         str_devices = os.environ["CUDA_VISIBLE_DEVICES"]
         warnings.warn(f'`CUDA_VISIBLE_DEVICES` is already set to "{str_devices}"!')

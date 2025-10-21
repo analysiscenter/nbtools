@@ -36,6 +36,7 @@ ignore = [
     "S101",
     "S301",
     "S102",
+    "S113",    # requests-call-without-timeout
 ]
 
 [lint.per-file-ignores] 

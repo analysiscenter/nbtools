@@ -1,7 +1,6 @@
 """ Command line interface of `nbstat`.
 Also provides `nbwatch`, `devicestat` and `devicewatch` functions.
 """
-#pylint: disable=redefined-outer-name, too-many-nested-blocks
 import sys
 import traceback
 from inspect import cleandoc
@@ -21,9 +20,9 @@ def main(name, interval=None):
     """ Run command `name`. If `interval` is given, continuously output it to a terminal in fullscreen mode. """
     # Attach SIGPIPE handler to properly handle broken pipe
     try: # sigpipe not available under windows. just ignore in this case
-        import signal # pylint: disable=import-outside-toplevel
+        import signal  # noqa: E402
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-    except Exception: # pylint: disable=broad-except
+    except Exception:  # noqa: BLE001, S110
         pass
 
     # Make parameters for requested view
@@ -54,7 +53,7 @@ def output_once(inspector, name, formatter, view_args):
     try:
         view = inspector.get_view(name=name, formatter=formatter, **view_args)
         print(view)
-    except Exception as e: # pylint: disable=broad-except
+    except Exception as e:
         _ = e
         print('Error on getting system information!' + str(e))
         raise e
@@ -62,7 +61,6 @@ def output_once(inspector, name, formatter, view_args):
 def output_looped(inspector, name, formatter, view_args,
                   other_name, other_formatter, other_view_args, interval=0.5):
     """ Output visualization to a stdout once each `interval` seconds in a fullscreen mode. """
-    #pylint: disable=too-many-statements
     terminal = Terminal()
 
     initial_view_args = dict(view_args)
@@ -194,7 +192,7 @@ def output_looped(inspector, name, formatter, view_args,
                         else:
                             print(f'\nUnrecognized key={inkey}, code={inkey.code}.')
 
-                except Exception as e: # pylint: disable=broad-except
+                except Exception as e:  # noqa: BLE001
                     sys.stderr.write(traceback.format_exc())
                     sys.stderr.write('Error on getting system information!')
                     sys.stderr.write(str(e))

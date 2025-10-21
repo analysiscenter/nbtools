@@ -32,7 +32,6 @@ class ResourceTable:
     # TODO: can require `index` and/or `columns` at table creation, should we want so, for consistency
     # TODO: can create a `PandasResourceTable` with the same API, but `pandas.DataFrame` under the hood
     """
-    #pylint: disable=self-cls-assignment
     def __init__(self, data=None):
         self._data = [] if data is None else [ResourceEntry(entry) for entry in data]
 
@@ -468,7 +467,7 @@ class ResourceTable:
                     if hide_similar and hidable and i > 0:
                         style, string = '', ''
 
-                    if False and i: # pylint: disable=condition-evals-to-constant
+                    if False and i:
                         # TODO: aggregate info by using `aggregate` method
                         # for a given resource and create a ResourceEntry out of it to make style/string
                         remaining_table = subtable[1:]
@@ -536,5 +535,5 @@ class ResourceTable:
     # Pandas compatibility
     def to_pd(self):
         """ Convert the table to a `pandas.DataFrame`. """
-        import pandas as pd #pylint: disable=import-outside-toplevel
+        import pandas as pd
         return pd.DataFrame(self.data)

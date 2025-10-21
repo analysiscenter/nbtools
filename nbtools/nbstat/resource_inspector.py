@@ -22,7 +22,7 @@ from ..exec_notebook import get_exec_notebook_name
 KERNEL_ID_SEARCHER   = re.compile('kernel-(.*).json').search
 VSCODE_KEY_SEARCHER  = re.compile('key=b"(.*)"').search
 SCRIPT_NAME_SEARCHER = re.compile('python.* (.*).py').search
-RUN_NOTEBOOK_PATH_SEARCHER = re.compile('/tmp/.*.json.*--HistoryManager.hist_file=:memory:.*').search
+RUN_NOTEBOOK_PATH_SEARCHER = re.compile('/tmp/.*.json.*--HistoryManager.hist_file=:memory:.*').search  # noqa: S108
 
 
 class ResourceInspector:
@@ -159,7 +159,6 @@ class ResourceInspector:
 
         TODO: once VSCode has stable standard and doc for ipykernel launches, add its parsing here.
         """
-        #pylint: disable=import-outside-toplevel, missing-timeout
         servers = []
         try:
             from notebook.notebookapp import list_running_servers as list_running_servers_v2
@@ -628,7 +627,7 @@ class ResourceInspector:
         """ Create terminal instance. """
         terminal = Terminal(kind=os.getenv('TERM'), force_styling=force_styling if force_styling else None)
         terminal.separator_symbol = separator
-        terminal._normal = '\x1b[0;10m' # pylint: disable=protected-access
+        terminal._normal = '\x1b[0;10m'  # noqa: SLF001
 
         # Change some methods to a faster versions
         # TODO: better measurements and tests for the same outputs
